@@ -187,7 +187,7 @@ function Ensure-AuthDomain([string]$frontendDomain) {
         if ($domains -notcontains $frontendDomain) {
             $domains += $frontendDomain
             $patchBody = @{ authorizedDomains = $domains } | ConvertTo-Json -Depth 4
-            Invoke-RestMethod -Method PATCH -Uri "$url?updateMask=authorizedDomains" -Headers $headers -ContentType "application/json" -Body $patchBody | Out-Null
+            Invoke-RestMethod -Method PATCH -Uri "${url}?updateMask=authorizedDomains" -Headers $headers -ContentType "application/json" -Body $patchBody | Out-Null
             Ok "Authorized domain added"
         } else {
             Ok "Authorized domain already present"
