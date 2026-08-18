@@ -23,6 +23,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$script:GcloudExecutable = (Get-Command gcloud -ErrorAction Stop).Source
+$script:BqExecutable = (Get-Command bq -ErrorAction Stop).Source
+
+function gcloud {
+    & $script:GcloudExecutable @args
+    if ($LASTEXITCODE -ne 0) { throw "gcloud command failed: $($args -join ' ')" }
+}
+
+function bq {
+    & $script:BqExecutable @args
+    if ($LASTEXITCODE -ne 0) { throw "bq command failed: $($args -join ' ')" }
+}
+
 function Require-Command([string]$name) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
         throw "Required command not found: $name"
@@ -64,8 +77,6 @@ function Ensure-Project() {
         Ok "Project exists"
     }
 
-    gcloud config set project $ProjectId | Out-Null
-
     if ($BillingAccount -ne "") {
         Info "Linking billing account"
         gcloud billing projects link $ProjectId --billing-account=$BillingAccount | Out-Null
@@ -74,33 +85,37 @@ function Ensure-Project() {
     }
 }
 
+function Wait-FirebaseOperation([string]$operationName, [hashtable]$headers) {
+    do {
+        $operation = Invoke-RestMethod -Method GET -Uri "https://firebase.googleapis.com/v1beta1/$operationName" -Headers $headers
+        if ($operation.error) { throw "Firebase operation failed: $($operation.error.message)" }
+        if (-not $operation.done) { [System.Threading.Thread]::Sleep(1500) }
+    } while (-not $operation.done)
+    return $operation.response
+}
+
 function Ensure-FirebaseAndFirestore() {
     Info "Ensuring Firebase is attached to project"
+    $token = gcloud auth print-access-token
+    $headers = @{ Authorization = "Bearer $token"; "x-goog-user-project" = $ProjectId }
+    $firebaseBase = "https://firebase.googleapis.com/v1beta1/projects/$ProjectId"
     try {
-        gcloud firebase projects:add-firebase $ProjectId --quiet | Out-Null
-        Ok "Firebase enabled"
+        Invoke-RestMethod -Method GET -Uri $firebaseBase -Headers $headers | Out-Null
+        Ok "Firebase already enabled"
     } catch {
-        Warn "Firebase may already be enabled: $($_.Exception.Message)"
+        $operation = Invoke-RestMethod -Method POST -Uri "$($firebaseBase):addFirebase" -Headers $headers -ContentType "application/json" -Body '{}'
+        Wait-FirebaseOperation $operation.name $headers | Out-Null
+        Ok "Firebase enabled"
     }
 
     Info "Ensuring Firestore database exists"
-    try {
-        $dbList = gcloud firestore databases list --project $ProjectId --format=json | ConvertFrom-Json
-        $defaultExists = $false
-        foreach ($db in $dbList) {
-            if ($db.name -match '/databases/\(default\)$') {
-                $defaultExists = $true
-            }
-        }
-
-        if (-not $defaultExists) {
-            gcloud firestore databases create --database="(default)" --location=$FirestoreLocation --type=firestore-native --project=$ProjectId | Out-Null
-            Ok "Created Firestore default database in $FirestoreLocation"
-        } else {
-            Ok "Firestore default database exists"
-        }
-    } catch {
-        Warn "Could not verify/create Firestore database automatically: $($_.Exception.Message)"
+    $dbList = gcloud firestore databases list --project $ProjectId --format=json | ConvertFrom-Json
+    $defaultExists = @($dbList).name -match '/databases/\(default\)$'
+    if (-not $defaultExists) {
+        gcloud firestore databases create --database="(default)" --location=$FirestoreLocation --type=firestore-native --project=$ProjectId --quiet | Out-Null
+        Ok "Created Firestore default database in $FirestoreLocation"
+    } else {
+        Ok "Firestore default database exists"
     }
 }
 
@@ -117,36 +132,23 @@ function Ensure-BigQueryDataset() {
 
 function Ensure-FirebaseWebAppConfig() {
     Info "Ensuring Firebase web app exists"
-    $appsJson = gcloud firebase apps list --project $ProjectId --format=json | ConvertFrom-Json
-    $webApp = $appsJson | Where-Object { $_.platform -eq "WEB" } | Select-Object -First 1
-
+    $token = gcloud auth print-access-token
+    $headers = @{ Authorization = "Bearer $token"; "x-goog-user-project" = $ProjectId }
+    $appsUri = "https://firebase.googleapis.com/v1beta1/projects/$ProjectId/webApps"
+    $appsResponse = Invoke-RestMethod -Method GET -Uri $appsUri -Headers $headers
+    $webApp = @($appsResponse.apps) | Select-Object -First 1
     if (-not $webApp) {
-        $created = gcloud firebase apps create WEB "Parliament Explorer" --project $ProjectId --format=json | ConvertFrom-Json
-        $appId = $created.appId
-        Ok "Created Firebase web app: $appId"
+        $body = @{ displayName = "Parliament AI" } | ConvertTo-Json
+        $operation = Invoke-RestMethod -Method POST -Uri $appsUri -Headers $headers -ContentType "application/json" -Body $body
+        $webApp = Wait-FirebaseOperation $operation.name $headers
+        Ok "Created Firebase web app"
     } else {
-        $appId = $webApp.appId
-        Ok "Firebase web app exists: $appId"
+        Ok "Firebase web app exists"
     }
-
-    $sdkConfigRaw = gcloud firebase apps sdkconfig WEB $appId --project $ProjectId --format=json
-    $sdkConfig = $sdkConfigRaw | ConvertFrom-Json
-
-    # Fallback fields if SDK config is returned as json string payload
-    if ($sdkConfig.apiKey) {
-        return $sdkConfig
-    }
-
-    if ($sdkConfig.fileContents) {
-        $jsonText = ($sdkConfig.fileContents -replace '^[^\{]*', '')
-        try {
-            return ($jsonText | ConvertFrom-Json)
-        } catch {
-            throw "Could not parse Firebase SDK config for app $appId"
-        }
-    }
-
-    throw "Unexpected Firebase SDK config format"
+    if (-not $webApp.appId) { throw "Firebase web app response did not include appId" }
+    $config = Invoke-RestMethod -Method GET -Uri "$appsUri/$($webApp.appId)/config" -Headers $headers
+    if (-not $config.apiKey -or -not $config.projectId -or -not $config.appId) { throw "Firebase SDK config is incomplete" }
+    return $config
 }
 
 function Ensure-AuthDomain([string]$frontendDomain) {
