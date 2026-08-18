@@ -73,6 +73,18 @@ function Wait-ServiceAccount([string]$email) {
     }
 }
 
+function Add-ProjectIamBinding([string]$member, [string]$role) {
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            gcloud projects add-iam-policy-binding $ProjectId --member=$member --role=$role | Out-Null
+            return
+        } catch {
+            if ($attempt -eq 20) { throw }
+            [System.Threading.Thread]::Sleep(1500)
+        }
+    }
+}
+
 function Ensure-Project() {
     Info "Ensuring GCP project exists: $ProjectId"
     $exists = $true
@@ -366,7 +378,7 @@ function Main() {
         "roles/cloudconfig.admin",
         "roles/logging.logWriter"
     ) | ForEach-Object {
-        gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$apiSaEmail" --role=$_ | Out-Null
+        Add-ProjectIamBinding "serviceAccount:$apiSaEmail" $_
     }
 
     Info "Deploying API service"
@@ -431,9 +443,9 @@ VITE_API_BASE_URL=$apiUrl
         Wait-ServiceAccount $jobSaEmail
     }
 
-    gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$jobSaEmail" --role="roles/bigquery.dataEditor" | Out-Null
-    gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$jobSaEmail" --role="roles/bigquery.jobUser" | Out-Null
-    gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$jobSaEmail" --role="roles/logging.logWriter" | Out-Null
+    Add-ProjectIamBinding "serviceAccount:$jobSaEmail" "roles/bigquery.dataEditor"
+    Add-ProjectIamBinding "serviceAccount:$jobSaEmail" "roles/bigquery.jobUser"
+    Add-ProjectIamBinding "serviceAccount:$jobSaEmail" "roles/logging.logWriter"
 
     $jobImage = "$Region-docker.pkg.dev/$ProjectId/parliament/ingestion-job:latest"
     Ensure-IngestionJob -jobImage $jobImage -jobServiceAccount $jobSaEmail
@@ -448,7 +460,7 @@ VITE_API_BASE_URL=$apiUrl
         Wait-ServiceAccount $schedulerSaEmail
     }
 
-    gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$schedulerSaEmail" --role="roles/run.admin" | Out-Null
+    Add-ProjectIamBinding "serviceAccount:$schedulerSaEmail" "roles/run.invoker"
 
     Ensure-Scheduler -schedulerSaEmail $schedulerSaEmail
 

@@ -42,6 +42,18 @@ wait_service_account() {
   done
 }
 
+add_project_iam_binding() {
+  local member="$1"
+  local role="$2"
+  for attempt in $(seq 1 20); do
+    if gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$member" --role="$role" >/dev/null 2>&1; then
+      return 0
+    fi
+    [[ "$attempt" -eq 20 ]] && return 1
+    sleep 1
+  done
+}
+
 need_cmd gcloud
 need_cmd bq
 need_cmd jq
@@ -158,7 +170,7 @@ if ! gcloud iam service-accounts describe "$API_SA" --project="$PROJECT_ID" >/de
   wait_service_account "$API_SA"
 fi
 for role in roles/aiplatform.user roles/bigquery.dataViewer roles/bigquery.jobUser roles/datastore.user roles/firebaseauth.admin roles/cloudconfig.admin roles/logging.logWriter; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$API_SA" --role="$role" >/dev/null
+  add_project_iam_binding "serviceAccount:$API_SA" "$role"
 done
 
 info "Deploying API"
@@ -227,9 +239,9 @@ if ! gcloud iam service-accounts describe "$JOB_SA" --project="$PROJECT_ID" >/de
   gcloud iam service-accounts create parliament-ingestion-sa --project="$PROJECT_ID" --display-name="Parliament Ingestion SA"
   wait_service_account "$JOB_SA"
 fi
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$JOB_SA" --role="roles/bigquery.dataEditor" >/dev/null
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$JOB_SA" --role="roles/bigquery.jobUser" >/dev/null
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$JOB_SA" --role="roles/logging.logWriter" >/dev/null
+add_project_iam_binding "serviceAccount:$JOB_SA" "roles/bigquery.dataEditor"
+add_project_iam_binding "serviceAccount:$JOB_SA" "roles/bigquery.jobUser"
+add_project_iam_binding "serviceAccount:$JOB_SA" "roles/logging.logWriter"
 
 cp ./scripts/ingest_to_bigquery.py ./cloud-jobs/ingester/ingest_to_bigquery.py
 JOB_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/parliament/ingestion-job:latest"
@@ -261,7 +273,7 @@ if ! gcloud iam service-accounts describe "$SCHED_SA" --project="$PROJECT_ID" >/
   gcloud iam service-accounts create parliament-scheduler-sa --project="$PROJECT_ID" --display-name="Parliament Scheduler SA"
   wait_service_account "$SCHED_SA"
 fi
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SCHED_SA" --role="roles/run.admin" >/dev/null
+add_project_iam_binding "serviceAccount:$SCHED_SA" "roles/run.invoker"
 
 SCHED_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${INGESTION_JOB_NAME}:run"
 if ! gcloud scheduler jobs describe "$SCHEDULER_JOB_NAME" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
