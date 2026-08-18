@@ -16,6 +16,7 @@ if (!getApps().length) {
 
 await getAuth().projectConfigManager().updateProjectConfig({
   multiFactorConfig: {
+    state: 'ENABLED',
     providerConfigs: [{
       state: 'ENABLED',
       totpProviderConfig: {
