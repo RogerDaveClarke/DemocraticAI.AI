@@ -405,7 +405,8 @@ VITE_API_BASE_URL=$apiUrl
         --region=$Region `
         --project=$ProjectId `
         --allow-unauthenticated `
-        --platform=managed | Out-Null
+        --platform=managed `
+        --port=80 | Out-Null
 
     $frontendUrl = gcloud run services describe $FrontendServiceName --region=$Region --project=$ProjectId --format="value(status.url)"
     $frontendDomain = ([uri]$frontendUrl).Host

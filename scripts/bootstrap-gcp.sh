@@ -194,7 +194,8 @@ gcloud run deploy "$FRONTEND_SERVICE_NAME" \
   --region="$REGION" \
   --project="$PROJECT_ID" \
   --allow-unauthenticated \
-  --platform=managed
+  --platform=managed \
+  --port=80
 
 FRONTEND_URL="$(gcloud run services describe "$FRONTEND_SERVICE_NAME" --region="$REGION" --project="$PROJECT_ID" --format='value(status.url)')"
 FRONTEND_DOMAIN="$(python3 - <<PY
