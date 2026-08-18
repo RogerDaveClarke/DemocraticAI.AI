@@ -277,6 +277,14 @@ function Ensure-PasswordlessIdentity() {
     $token = gcloud auth print-access-token
     $headers = @{ Authorization = "Bearer $token"; "x-goog-user-project" = $ProjectId }
     $url = "https://identitytoolkit.googleapis.com/admin/v2/projects/$ProjectId/config"
+    try {
+        Invoke-RestMethod -Method GET -Uri $url -Headers $headers | Out-Null
+    } catch {
+        if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+        Info "Initializing Identity Platform"
+        $initializeUrl = "https://identitytoolkit.googleapis.com/v2/projects/$ProjectId/identityPlatform:initializeAuth"
+        Invoke-RestMethod -Method POST -Uri $initializeUrl -Headers $headers -ContentType "application/json" -Body '{}' | Out-Null
+    }
     $body = @{ signIn = @{ email = @{ enabled = $true; passwordRequired = $false } } } | ConvertTo-Json -Depth 5
     Invoke-RestMethod -Method PATCH -Uri "${url}?updateMask=signIn.email" -Headers $headers -ContentType "application/json" -Body $body | Out-Null
 
