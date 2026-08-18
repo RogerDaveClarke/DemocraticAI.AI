@@ -157,7 +157,7 @@ if ! gcloud iam service-accounts describe "$API_SA" --project="$PROJECT_ID" >/de
   gcloud iam service-accounts create parliament-api-sa --project="$PROJECT_ID" --display-name="Parliament API Runtime"
   wait_service_account "$API_SA"
 fi
-for role in roles/aiplatform.user roles/bigquery.dataViewer roles/bigquery.jobUser roles/datastore.user roles/firebaseauth.admin roles/firebase.remoteConfigAdmin roles/logging.logWriter; do
+for role in roles/aiplatform.user roles/bigquery.dataViewer roles/bigquery.jobUser roles/datastore.user roles/firebaseauth.admin roles/cloudconfig.admin roles/logging.logWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$API_SA" --role="$role" >/dev/null
 done
 

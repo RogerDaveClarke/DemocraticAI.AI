@@ -363,7 +363,7 @@ function Main() {
         "roles/bigquery.jobUser",
         "roles/datastore.user",
         "roles/firebaseauth.admin",
-        "roles/firebase.remoteConfigAdmin",
+        "roles/cloudconfig.admin",
         "roles/logging.logWriter"
     ) | ForEach-Object {
         gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$apiSaEmail" --role=$_ | Out-Null
