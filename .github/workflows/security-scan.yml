@@ -1,0 +1,47 @@
+name: Security Scan (React & Google Services)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  security-audit:
+    name: Run Vulnerability Scans
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the source code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # TruffleHog needs full history to scan commits
+
+      # Step 2: Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Change to match your React project version
+          cache: 'npm'
+
+      # Step 3: Check npm dependencies for known vulnerabilities (SCA)
+      - name: Check Package Dependencies (npm audit)
+        run: |
+          npm ci # Clean install dependencies
+          npm audit --audit-level=high # Fails the build only for High/Critical issues
+
+      # Step 4: Scan React code for security flaws (SAST)
+      - name: Static Code Analysis (Semgrep)
+        run: |
+          pip install semgrep
+          semgrep scan --config=auto --error
+
+      # Step 5: Scan repository for leaked Google/Firebase Secrets
+      - name: Secret Detection (TruffleHog)
+        uses: trufflesecurity/trufflehog-oss-action@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified

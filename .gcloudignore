@@ -1,0 +1,11 @@
+﻿.gcloudignore
+.git
+.gitignore
+node_modules
+dist
+*.log
+.env*
+!.env.production
+.venv
+.vscode
+.idea

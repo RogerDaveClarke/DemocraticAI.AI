@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feedback UI Mockup — Parliament AI Research</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy-950: #0b1f3a;
+      --navy-900: #0d3b66;
+      --navy-800: #1b3a5c;
+      --navy-100: #d8e3ef;
+      --teal-600: #14b8a6;
+      --teal-500: #2dd4bf;
+      --teal-100: #dbf5f3;
+      --canvas: #f8fafc;
+      --border: #e2e8f0;
+      --ink: #0f172a;
+      --slate: #64748b;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--canvas);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 24px 80px;
+      gap: 48px;
+    }
+
+    h1 {
+      font-size: 13px; font-weight: 500; color: var(--slate);
+      letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
+    }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; color: var(--navy-800);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      margin-bottom: 12px; padding: 4px 10px;
+      background: var(--navy-100); border-radius: 4px; display: inline-block;
+    }
+
+    /* chat frame */
+    .chat-frame {
+      width: 680px; max-width: 100%;
+      background: white; border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .chat-header {
+      background: linear-gradient(135deg, var(--navy-950), var(--navy-800));
+      padding: 14px 20px; display: flex; align-items: center; gap: 10px; color: white;
+    }
+    .chat-header-icon {
+      width: 28px; height: 28px; background: var(--teal-600);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    }
+    .chat-header-icon svg { width: 14px; height: 14px; stroke: white; fill: none; stroke-width: 2; }
+    .chat-header-title { font-size: 13px; font-weight: 600; }
+    .chat-header-pills { display: flex; gap: 6px; margin-left: auto; }
+    .pill {
+      font-size: 10px; font-weight: 500; padding: 3px 8px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8);
+      display: flex; align-items: center; gap: 4px;
+    }
+    .pill svg { width: 9px; height: 9px; stroke: var(--teal-500); fill: none; stroke-width: 2.5; }
+
+    .chat-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; background: var(--slate-50); }
+
+    /* messages */
+    .msg-user {
+      align-self: flex-end; max-width: 80%;
+      background: var(--navy-950); color: white; font-size: 13px;
+      padding: 10px 14px; border-radius: 12px 12px 2px 12px;
+      border: 1px solid var(--navy-800); line-height: 1.5;
+    }
+
+    .msg-bot-wrap { display: flex; flex-direction: column; }
+
+    .msg-bot {
+      background: white; border: 1px solid var(--border);
+      border-radius: 2px 12px 0 0; padding: 14px 16px;
+      font-size: 13px; line-height: 1.6; color: var(--ink);
+    }
+    .msg-bot p { margin-bottom: 8px; }
+    .msg-bot p:last-child { margin-bottom: 0; }
+
+    /* footer */
+    .msg-footer {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px 6px 16px;
+      background: white; border: 1px solid var(--border); border-top: none;
+    }
+    .msg-footer.rounded-bottom { border-radius: 0 0 12px 12px; }
+
+    .meta-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal-600); flex-shrink: 0; }
+    .meta-label { font-size: 11px; color: var(--teal-600); font-weight: 500; }
+    .meta-sep { font-size: 11px; color: var(--border); }
+    .meta-sources { font-size: 11px; color: var(--slate); }
+    .footer-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+
+    .icon-btn {
+      width: 28px; height: 28px; border: none; background: transparent;
+      border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--slate); transition: background 0.12s, color 0.12s; position: relative;
+    }
+    .icon-btn:hover { background: var(--slate-100); }
+    .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .icon-btn.active-up   { color: var(--teal-600); background: var(--teal-100); }
+    .icon-btn.active-down { color: #ef4444; background: #fef2f2; }
+    .icon-btn.active-talk { color: var(--navy-900); background: var(--navy-100); }
+    .icon-btn[disabled]   { opacity: 0.3; pointer-events: none; }
+
+    .icon-btn::after {
+      content: attr(data-tip); position: absolute;
+      bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: white; font-size: 10px;
+      white-space: nowrap; padding: 3px 7px; border-radius: 4px;
+      opacity: 0; pointer-events: none; transition: opacity 0.15s;
+    }
+    .icon-btn:hover::after { opacity: 1; }
+
+    .confirmed-label { font-size: 11px; color: var(--teal-600); font-weight: 500; white-space: nowrap; }
+
+    /* feedback panel */
+    .feedback-panel {
+      background: white; border: 1px solid var(--border);
+      border-top: 1px dashed var(--border); border-radius: 0 0 12px 12px;
+      padding: 14px 16px 16px;
+      animation: slideDown 0.18s ease;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .feedback-panel-label {
+      font-size: 11px; font-weight: 600; color: var(--slate);
+      text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px;
+    }
+
+    .category-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .cat-chip {
+      font-size: 12px; padding: 5px 10px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--slate-50);
+      color: var(--ink); cursor: pointer; user-select: none; transition: all 0.12s;
+    }
+    .cat-chip:hover { border-color: var(--teal-600); background: var(--teal-100); }
+    .cat-chip.selected { border-color: var(--teal-600); background: var(--teal-100); color: #0f766e; font-weight: 500; }
+
+    .verbatim-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .verbatim-wrap textarea {
+      width: 100%; font-size: 12px; font-family: inherit;
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      resize: none; color: var(--ink); background: var(--slate-50); line-height: 1.5;
+    }
+    .verbatim-wrap textarea:focus {
+      outline: none; border-color: var(--teal-600);
+      box-shadow: 0 0 0 3px rgba(20,184,166,0.1);
+    }
+    .privacy-note { font-size: 10px; color: var(--slate); }
+
+    .feedback-panel-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .btn-ghost {
+      font-size: 12px; padding: 5px 12px; border-radius: 6px;
+      border: 1px solid var(--border); background: white; color: var(--slate); cursor: pointer;
+    }
+    .btn-primary {
+      font-size: 12px; padding: 5px 14px; border-radius: 6px; border: none;
+      background: var(--teal-600); color: white; font-weight: 500; cursor: pointer;
+    }
+
+    .hidden { display: none !important; }
+    .scenario-wrap { width: 680px; max-width: 100%; }
+    .divider { width: 680px; height: 1px; background: var(--border); }
+  </style>
+</head>
+<body>
+
+<h1>Parliament AI — Feedback UI Mockup (interactive)</h1>
+
+<!-- PRIMARY INTERACTIVE DEMO -->
+<div class="scenario-wrap">
+  <div class="section-label">Primary pattern — click the three controls to try each state</div>
+  <div class="chat-frame">
+    <div class="chat-header">
+      <div class="chat-header-icon">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <span class="chat-header-title">AI Research Assistant</span>
+      <div class="chat-header-pills">
+        <span class="pill"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Source grounded</span>
+        <span class="pill"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Verifiable</span>
+      </div>
+    </div>
+    <div class="chat-body">
+      <div class="msg-user">
+        How has the Dáil voted on housing legislation in the last 12 months?
+      </div>
+      <div class="msg-bot-wrap" id="demo-wrap">
+        <div class="msg-bot">
+          <p>Between August 2025 and August 2026 the Dáil held <strong>14 recorded divisions</strong> on housing-related legislation. The Housing (Emergency Measures) Act 2025 passed on second reading by 82 votes to 56, with two Independent TDs voting with the Government bloc.</p>
+          <p>The Renters' Rights (Amendment) Bill was defeated at committee stage by 9 votes to 7 following opposition from the Property Owners' Association lobby group.</p>
+        </div>
+        <div class="msg-footer" id="demo-footer">
+          <div class="meta-dot"></div>
+          <span class="meta-label">High confidence</span>
+          <span class="meta-sep">|</span>
+          <span class="meta-sources">6 sources</span>
+          <div class="footer-actions">
+            <button class="icon-btn" data-tip="Copy" onclick="doCopy(this)">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-up" data-tip="Helpful" onclick="doUp()">
+              <svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-down" data-tip="Not helpful" onclick="doDown()">
+              <svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+            </button>
+            <!-- structured feedback: categories + verbatim, toggleable -->
+            <button class="icon-btn" id="btn-talk" data-tip="Give feedback" onclick="doTalk()">
+              <svg viewBox="0 0 24 24">
+                <circle cx="9" cy="6" r="3"/>
+                <path d="M3 20v-1a5 5 0 0 1 5-5h2"/>
+                <path d="M16 12h6v5a1 1 0 0 1-1 1h-1l-1 2-1-2h-2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z"/>
+              </svg>
+            </button>
+            <span class="confirmed-label hidden" id="demo-confirmed"></span>
+          </div>
+        </div>
+
+        <!-- talking-head panel: category chips + optional verbatim (toggleable) -->
+        <div class="feedback-panel hidden" id="panel-talk">
+          <div class="feedback-panel-label">What could be improved?</div>
+          <div class="category-grid">
+            <span class="cat-chip" onclick="toggleChip(this)">Response didn't seem relevant</span>
+            <span class="cat-chip" onclick="toggleChip(this)">Sources were unclear or missing</span>
+            <span class="cat-chip" onclick="toggleChip(this)">Response seemed biased or one-sided</span>
+            <span class="cat-chip" onclick="toggleChip(this)">Response seemed factually questionable</span>
+            <span class="cat-chip" onclick="toggleChip(this)">Other</span>
+          </div>
+          <div class="verbatim-wrap">
+            <textarea id="talk-text" rows="2" placeholder="Optional: describe the issue (do not include personal information)"></textarea>
+            <span class="privacy-note">Don't include personal information. Your feedback helps improve this assistant.</span>
+          </div>
+          <div class="feedback-panel-footer">
+            <button class="btn-ghost" onclick="closeAll()">Dismiss</button>
+            <button class="btn-primary" onclick="submitFeedback('talk')">Submit feedback</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- thumbs-up submitted state -->
+<div class="scenario-wrap">
+  <div class="section-label">After thumbs-up — terminal, no panel</div>
+  <div class="chat-frame">
+    <div class="chat-header">
+      <div class="chat-header-icon"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <span class="chat-header-title">AI Research Assistant</span>
+    </div>
+    <div class="chat-body">
+      <div class="msg-user">Who chairs the Committee on Finance?</div>
+      <div class="msg-bot-wrap">
+        <div class="msg-bot"><p>The Joint Committee on Finance is currently chaired by Deputy Patricia Ryan (Fianna Fáil).</p></div>
+        <div class="msg-footer rounded-bottom">
+          <div class="meta-dot"></div>
+          <span class="meta-label">High confidence</span>
+          <span class="meta-sep">|</span>
+          <span class="meta-sources">3 sources</span>
+          <div class="footer-actions">
+            <button class="icon-btn" data-tip="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            <button class="icon-btn active-up" disabled><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>
+            <button class="icon-btn" disabled><svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></button>
+            <button class="icon-btn" disabled><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h2"/><path d="M16 12h6v5a1 1 0 0 1-1 1h-1l-1 2-1-2h-2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z"/></svg></button>
+            <span class="confirmed-label">Thanks for the feedback</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- panel submitted state -->
+<div class="scenario-wrap">
+  <div class="section-label">After panel submitted — collapsed, all controls locked</div>
+  <div class="chat-frame">
+    <div class="chat-header">
+      <div class="chat-header-icon"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <span class="chat-header-title">AI Research Assistant</span>
+    </div>
+    <div class="chat-body">
+      <div class="msg-user">How has the Dáil voted on housing legislation in the last 12 months?</div>
+      <div class="msg-bot-wrap">
+        <div class="msg-bot"><p>Between August 2025 and August 2026 the Dáil held <strong>14 recorded divisions</strong> on housing-related legislation…</p></div>
+        <div class="msg-footer rounded-bottom">
+          <div class="meta-dot"></div>
+          <span class="meta-label">High confidence</span>
+          <span class="meta-sep">|</span>
+          <span class="meta-sources">6 sources</span>
+          <div class="footer-actions">
+            <button class="icon-btn" data-tip="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            <button class="icon-btn" disabled><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>
+            <button class="icon-btn active-down" disabled><svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></button>
+            <button class="icon-btn" disabled><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h2"/><path d="M16 12h6v5a1 1 0 0 1-1 1h-1l-1 2-1-2h-2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z"/></svg></button>
+            <span class="confirmed-label">Feedback received</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let openPanel = null;
+  let submitted = false;
+
+  function closeAll() {
+    document.getElementById('panel-talk').classList.add('hidden');
+    document.getElementById('demo-footer').classList.add('rounded-bottom');
+    document.getElementById('btn-talk').classList.remove('active-talk');
+    openPanel = null;
+  }
+
+  function doUp() {
+    if (submitted) return;
+    closeAll();
+    submitted = true;
+    document.getElementById('btn-up').classList.add('active-up');
+    document.getElementById('btn-down').disabled = true;
+    document.getElementById('btn-talk').disabled = true;
+    const c = document.getElementById('demo-confirmed');
+    c.textContent = 'Thanks for the feedback';
+    c.classList.remove('hidden');
+  }
+
+  // thumbs-down is a quick terminal signal — no panel
+  function doDown() {
+    if (submitted) return;
+    submitted = true;
+    closeAll();
+    document.getElementById('btn-down').classList.add('active-down');
+    document.getElementById('btn-up').disabled = true;
+    document.getElementById('btn-talk').disabled = true;
+    const c = document.getElementById('demo-confirmed');
+    c.textContent = 'Thanks for the feedback';
+    c.classList.remove('hidden');
+  }
+
+  function doTalk() {
+    if (submitted) return;
+    if (openPanel === 'talk') { closeAll(); return; }
+    closeAll();
+    document.getElementById('panel-talk').classList.remove('hidden');
+    document.getElementById('demo-footer').classList.remove('rounded-bottom');
+    document.getElementById('btn-talk').classList.add('active-talk');
+    openPanel = 'talk';
+    setTimeout(() => document.getElementById('talk-text').focus(), 50);
+  }
+
+  function toggleChip(el) {
+    const wasSelected = el.classList.contains('selected');
+    el.closest('.category-grid').querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
+    if (!wasSelected) el.classList.add('selected');
+  }
+
+  function submitFeedback(which) {
+    submitted = true;
+    if (which === 'down') document.getElementById('btn-down').classList.add('active-down');
+    if (which === 'talk') document.getElementById('btn-talk').classList.add('active-talk');
+    closeAll();
+    ['btn-up','btn-down','btn-talk'].forEach(id => { document.getElementById(id).disabled = true; });
+    const c = document.getElementById('demo-confirmed');
+    c.textContent = 'Feedback received';
+    c.classList.remove('hidden');
+  }
+
+  function doCopy(btn) {
+    btn.style.color = 'var(--teal-600)';
+    setTimeout(() => btn.style.color = '', 800);
+  }
+</script>
+</body>
+</html>

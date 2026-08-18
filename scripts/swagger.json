@@ -1,0 +1,1766 @@
+﻿{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.1.0",
+    "title": "Houses of the Oireachtas Open Data APIs",
+    "description": "The Houses of the Oireachtas is providing these APIs to allow our datasets to be retrieved and reused as widely as possible. They are intended to be used in conjunction with https://data.oireachtas.ie, from where our datasets can be accessed directly. By using the APIs, users can make metadata queries to identify the specific data they require. New data are available through the API as soon as they are published.\n\nCurrently, https://data.oireachtas.ie contains data in XML format from the Official Report of the Houses of the Oireachtas (the \"debates\") and replies to Parliamentary Questions in XML files complying with the [Akoma Ntoso](https://unsceb-hlcm.github.io) schema, as well as data in PDF format for Bills, Acts and other documents published by the Houses of the Oireachtas.\n\nFiles can be retrieved from https://data.oireachtas.ie by adding the URI fragment contained in the \"formats\" fields of the JSON documents returned by these APIs. At the moment only PDF and XML files are available directly from https://data.oireachtas.ie, but this will become the endpoint for direct access of all \"uri\" fields in the data queried through https://api.oireachtas.ie. We will also be making bulk downloads available through https://data.oireachtas.ie.\n\nPlease note the APIs are a work in progress. We are working on expanding the range of datasets we publish, and we are interested in hearing about how to make these APIs more useful and wide ranging. For these reasons, we welcome any feedback, suggestions and user stories to open.data@oireachtas.ie\n\nData published through these APIs are made available under the [Oireachtas (Open Data) PSI Licence](https://www.oireachtas.ie/en/open-data/license/)",
+    "license": {
+      "name": "Oireachtas (Open Data) PSI Licence ",
+      "url": "https://www.oireachtas.ie/en/open-data/license/"
+    },
+    "contact": {
+      "name": "Oireachtas Open Data",
+      "email": "open.data@oireachtas.ie",
+      "url": "https://www.oireachtas.ie/en/open-data"
+    }
+  },
+  "host": "api.oireachtas.ie",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/constituencies": {
+      "x-swagger-router-controller": "constituencies",
+      "get": {
+        "summary": "Constituencies Endpoint",
+        "description": "Returns list of constituencies filtered by the base and additional parameters.\nThe list supports paging.\n\n#### Mapping\n* chamber_id - house.uri\n* chamber - house.houseCode\n* house_no - house.houseNo\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records",
+        "tags": [
+          "constituencies"
+        ],
+        "operationId": "constituencies",
+        "parameters": [
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/houseNo"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "constituencyCount": {
+                          "type": "integer",
+                          "example": 8
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 8
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "constituencyOrPanel": {
+                        "type": "object",
+                        "properties": {
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "example": "https://data.oireachtas.ie/ie/oireachtas/house/seanad/9/panel/Nominated-by-the-Taoiseach"
+                          },
+                          "representType": {
+                            "type": "string",
+                            "example": "panel"
+                          },
+                          "representCode": {
+                            "type": "string",
+                            "example": "Nominated-by-the-Taoiseach"
+                          },
+                          "showAs": {
+                            "type": "string",
+                            "example": "Nominated by the Taoiseach"
+                          }
+                        }
+                      },
+                      "house": {
+                        "type": "object",
+                        "properties": {
+                          "houseNo": {
+                            "type": "string",
+                            "example": "9"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "example": "https://data.oireachtas.ie/ie/oireachtas/house/seanad/9"
+                          },
+                          "houseCode": {
+                            "type": "string",
+                            "example": "seanad"
+                          },
+                          "showAs": {
+                            "type": "string",
+                            "example": "9th Seanad"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/debates": {
+      "x-swagger-router-controller": "debates",
+      "get": {
+        "summary": "Debates Endpoint",
+        "description": "Returns list of debates filtered by the base and additional parameters.\nThe list supports paging.\n#### Mapping\n* chamber_type - debateRecord.house.chamberType\n* chamber_id - debateRecord.house.uri\n* chamber - debateRecord.house.houseCode\n* date_start (Greater Than or Equal To) - debateRecord.date\n* date_end (Less Than or Equal To) - debateRecord.date\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records\n* member_id - debateRecord.debateSections.debateSection.speakers.speaker\n* debate_id - debateRecord.uri",
+        "tags": [
+          "debates"
+        ],
+        "operationId": "debates",
+        "parameters": [
+          {
+            "$ref": "#/parameters/chamberType"
+          },
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/dateStart"
+          },
+          {
+            "$ref": "#/parameters/dateEnd"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/memberID"
+          },
+          {
+            "$ref": "#/parameters/debateID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "debateCount": { "type": "integer" },
+                        "resultCount": { "type": "integer" }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "contextDate": { "type": "string", "format": "date" },
+                      "debateRecord": {
+                        "type": "object",
+                        "properties": {
+                          "formats": {
+                            "type": "object",
+                            "properties": {
+                              "xml": {
+                                "type": "object",
+                                "properties": {
+                                  "uri": { "type": "string", "format": "uri" }
+                                }
+                              },
+                              "writtens_pdf": {
+                                "type": "object",
+                                "properties": {
+                                  "uri": { "type": "string", "format": "uri" }
+                                }
+                              },
+                              "pdf": {
+                                "type": "object",
+                                "properties": {
+                                  "uri": { "type": "string", "format": "uri" }
+                                }
+                              }
+                            }
+                          },
+                          "lastUpdated": { "type": "string", "format": "date-time" },
+                          "debateSections": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "debateSection": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": {
+                                      "type": "object",
+                                      "properties": {
+                                        "xml": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        },
+                                        "pdf": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "speakers": {
+                                      "type": "array",
+                                      "items": {}
+                                    },
+                                    "debateSectionId": { "type": "string" },
+                                    "containsDebate": { "type": "boolean" },
+                                    "uri": { "type": "string", "format": "uri" },
+                                    "parentDebateSection": {
+                                      "type": "object",
+                                      "properties": {
+                                        "formats": {
+                                          "type": "object",
+                                          "properties": {
+                                            "xml": {
+                                              "type": "object",
+                                              "properties": {
+                                                "uri": { "type": "string", "format": "uri" }
+                                              }
+                                            },
+                                            "pdf": {
+                                              "type": "object",
+                                              "properties": {
+                                                "uri": { "type": "string", "format": "uri" }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "debateSectionId": { "type": "string" },
+                                        "uri": { "type": "string", "format": "uri" },
+                                        "showAs": { "type": "string" }
+                                      }
+                                    },
+                                    "bill": {
+                                      "type": "object",
+                                      "properties": {
+                                        "event": {
+                                          "type": "object",
+                                          "properties": {
+                                            "showAs": { "type": "string" },
+                                            "houseCode": { "type": "string" },
+                                            "stage": { "type": "string" },
+                                            "uri": { "type": "string", "format": "uri" },
+                                            "isBillStage": { "type": "boolean" }
+                                          }
+                                        },
+                                        "uri": { "type": "string", "format": "uri" }
+                                      }
+                                    },
+                                    "showAs": { "type": "string" },
+                                    "debateType": { "type": "string" },
+                                    "counts": {
+                                      "type": "object",
+                                      "properties": {
+                                        "speechCount": { "type": "integer" },
+                                        "speakerCount": { "type": "integer" }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "date": { "type": "string", "format": "date" },
+                          "chamber": {
+                            "type": "object",
+                            "properties": {
+                              "uri": { "type": "string", "format": "uri" },
+                              "showAs": { "type": "string" }
+                            }
+                          },
+                          "house": {
+                            "type": "object",
+                            "properties": {
+                              "houseCode": { "type": "string" },
+                              "houseNo": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" },
+                              "chamberType": { "type": "string" },
+                              "committeeCode": { "type": "string" },
+                              "showAs": { "type": "string" }
+                            }
+                          },
+                          "debateType": { "type": "string" },
+                          "uri": { "type": "string", "format": "uri" },
+                          "counts": {
+                            "type": "object",
+                            "properties": {
+                              "debateSectionCount": { "type": "integer" },
+                              "questionCount": { "type": "integer" },
+                              "contributorCount": { "type": "integer" },
+                              "billCount": { "type": "integer" },
+                              "divisionCount": { "type": "integer" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/houses": {
+      "x-swagger-router-controller": "houses",
+      "get": {
+        "summary": "Houses Endpoint",
+        "description": "Returns list of houses filtered by the base and additional parameters.\nThe list supports paging.\n#### Mapping\n* chamber_id - house.uri\n* chamber - house.houseCode\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records",
+        "tags": [
+          "houses"
+        ],
+        "operationId": "houses",
+        "parameters": [
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "housesCount": {
+                          "type": "integer",
+                          "example": 68
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 68
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "house": {
+                        "type": "object",
+                        "properties": {
+                          "houseCode": {
+                            "type": "string",
+                            "example": "seanad"
+                          },
+                          "houseType": {
+                            "type": "string",
+                            "example": "seanad"
+                          },
+                          "showAs": {
+                            "type": "string",
+                            "example": "27th Seanad"
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "example": 60
+                          },
+                          "dateRange": {
+                            "type": "object",
+                            "properties": {
+                              "start": {
+                                "type": "string",
+                                "format": "date",
+                                "example": "2025-01-29"
+                              },
+                              "end": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": null
+                              }
+                            }
+                          },
+                          "chamberCode": {
+                            "type": "string",
+                            "example": "seanad"
+                          },
+                          "chamberType": {
+                            "type": "string",
+                            "example": "house"
+                          },
+                          "houseNo": {
+                            "type": "string",
+                            "example": "27"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "example": "https://data.oireachtas.ie/ie/oireachtas/house/seanad/27"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/legislation": {
+      "x-swagger-router-controller": "legislation",
+      "get": {
+        "summary": "Legislation Endpoint",
+        "description": "Returns list of bills filtered by the base and additional parameters.\nThe list supports paging.\n\n#### Mapping\n* bill_status - bill.status\n* bill_source - bill.source\n* date_start (Greater Than or Equal To) - bill.mostRecentStage.event.dates.date\n* date_end (Less Than or Equal To) - bill.mostRecentStage.event.dates.date\n* last_updated (Greater Than or Equal To) - bill.lastUpdated\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records\n* member_id - bill.sponsors.sponsor.by.uri\n* bill_id - bill.uri\n* bill_no - bill.billNo\n* bill_year - bill.billYear\n* chamber_id - bill.mostRecentStage.event.house.uri\n* act_year - bill.act.actYear\n* act_no - bill.act.actNo",
+        "tags": [
+          "legislation"
+        ],
+        "operationId": "legislation",
+        "parameters": [
+          {
+            "$ref": "#/parameters/billStatus"
+          },
+          {
+            "$ref": "#/parameters/billSource"
+          },
+          {
+            "$ref": "#/parameters/dateStart"
+          },
+          {
+            "$ref": "#/parameters/dateEnd"
+          },
+          {
+            "$ref": "#/parameters/lastUpdated"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/memberID"
+          },
+          {
+            "$ref": "#/parameters/billID"
+          },
+          {
+            "$ref": "#/parameters/billNo"
+          },
+          {
+            "$ref": "#/parameters/billYear"
+          },
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/actYear"
+          },
+          {
+            "$ref": "#/parameters/actNo"
+          },
+          {
+            "$ref": "#/parameters/lang"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "billCount": { "type": "integer" },
+                        "resultCount": { "type": "integer" }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "bill": {
+                        "type": "object",
+                        "properties": {
+                          "billNo": { "type": "string" },
+                          "billYear": { "type": "string" },
+                          "billType": { "type": "string" },
+                          "billTypeURI": { "type": "string", "format": "uri" },
+                          "shortTitleEn": { "type": "string" },
+                          "shortTitleGa": { "type": "string" },
+                          "longTitleEn": { "type": "string" },
+                          "longTitleGa": { "type": "string" },
+                          "method": { "type": "string" },
+                          "methodURI": { "type": "string", "format": "uri" },
+                          "source": { "type": "string" },
+                          "sourceURI": { "type": "string", "format": "uri" },
+                          "lastUpdated": { "type": "string", "format": "date-time" },
+                          "originHouseURI": { "type": "string", "format": "uri" },
+                          "originHouse": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" }
+                            }
+                          },
+                          "act": {
+                            "type": "object",
+                            "properties": {
+                              "actNo": { "type": "string" },
+                              "actYear": { "type": "string" },
+                              "dateSigned": { "type": "string", "format": "date" },
+                              "shortTitleEn": { "type": "string" },
+                              "shortTitleGa": { "type": "string" },
+                              "longTitleEn": { "type": "string" },
+                              "longTitleGa": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" },
+                              "statutebookURI": { "type": "string", "format": "uri" }
+                            }
+                          },
+                          "amendmentLists": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "amendmentList": {
+                                  "type": "object",
+                                  "properties": {
+                                    "amendmentTypeUri": {
+                                      "type": "object",
+                                      "properties": {
+                                        "uri": { "type": "string", "format": "uri" }
+                                      }
+                                    },
+                                    "chamber": {
+                                      "type": "object",
+                                      "properties": {
+                                        "showAs": { "type": "string" },
+                                        "uri": { "type": "string", "format": "uri" }
+                                      }
+                                    },
+                                    "date": { "type": "string", "format": "date" },
+                                    "formats": {
+                                      "type": "object",
+                                      "properties": {
+                                        "pdf": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        },
+                                        "xml": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "showAs": { "type": "string" },
+                                    "stage": {
+                                      "type": "object",
+                                      "properties": {
+                                        "showAs": { "type": "string" },
+                                        "uri": { "type": "string", "format": "uri" }
+                                      }
+                                    },
+                                    "stageNo": { "type": "string" }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "debates": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "chamber": {
+                                  "type": "object",
+                                  "properties": {
+                                    "showAs": { "type": "string" },
+                                    "uri": { "type": "string", "format": "uri" }
+                                  }
+                                },
+                                "date": { "type": "string", "format": "date" },
+                                "debateSectionId": { "type": "string" },
+                                "showAs": { "type": "string" },
+                                "uri": { "type": "string", "format": "uri" }
+                              }
+                            }
+                          },
+                          "events": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "event": {
+                                  "type": "object",
+                                  "properties": {
+                                    "chamber": {
+                                      "type": "object",
+                                      "properties": {
+                                        "chamberCode": { "type": "string" },
+                                        "showAs": { "type": "string" },
+                                        "uri": { "type": "string", "format": "uri" }
+                                      }
+                                    },
+                                    "dates": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "date": { "type": "string", "format": "date" }
+                                        }
+                                      }
+                                    },
+                                    "eventURI": { "type": "string", "format": "uri" },
+                                    "showAs": { "type": "string" },
+                                    "uri": { "type": "string", "format": "uri" }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "mostRecentStage": {
+                            "type": "object",
+                            "properties": {
+                              "event": {
+                                "type": "object",
+                                "properties": {
+                                  "stageCompleted": { "type": "boolean" },
+                                  "stageOutcome": { "type": "string" },
+                                  "progressStage": { "type": "integer" },
+                                  "showAs": { "type": "string" },
+                                  "stageURI": { "type": "string", "format": "uri" },
+                                  "uri": { "type": "string", "format": "uri" },
+                                  "dates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "date": { "type": "string", "format": "date" }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "relatedDocs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "relatedDoc": {
+                                  "type": "object",
+                                  "properties": {
+                                    "date": { "type": "string", "format": "date" },
+                                    "docType": { "type": "string" },
+                                    "lang": { "type": "string" },
+                                    "showAs": { "type": "string" },
+                                    "uri": { "type": "string", "format": "uri" },
+                                    "formats": {
+                                      "type": "object",
+                                      "properties": {
+                                        "pdf": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        },
+                                        "xml": {
+                                          "type": "object",
+                                          "properties": {
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/members": {
+      "get": {
+        "summary": "Members Endpoint",
+        "description": "Returns a list of members.\nThe list supports paging.\n\n#### Mapping\n* date_start (Greater Than or Equal To) - member.memberships.membership.dateRange.start\n* date_end (Less Than or Equal To) - member.memberships.membership.dateRange.start\n* chamber_id - member.memberships.membership.house.uri\n* chamber - member.memberships.membership.house.houseCode\n* house_no - member.memberships.membership.house.houseNo\n* member_id - member.uri\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records\n* party_code - member.memberships.membership.parties.party.partyCode\n* party_id - member.memberships.membership.parties.party.uri\n* const_code - member.memberships.membership.represents.represent.representCode\n* const_id - member.memberships.membership.represents.represent.uri\n* fuzzy_name_search - member.fullName",
+        "tags": [
+          "members"
+        ],
+        "operationId": "members",
+        "parameters": [
+          {
+            "$ref": "#/parameters/dateStart"
+          },
+          {
+            "$ref": "#/parameters/dateEnd"
+          },
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/houseNo"
+          },
+          {
+            "$ref": "#/parameters/memberID"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/partyCode"
+          },
+          {
+            "$ref": "#/parameters/partyID"
+          },
+          {
+            "$ref": "#/parameters/constituencyCode"
+          },
+          {
+            "$ref": "#/parameters/constituencyID"
+          },
+          {
+            "$ref": "#/parameters/fuzzyNameSearch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "memberCount": {
+                          "type": "integer",
+                          "example": 1927
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 1927
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "member": {
+                        "type": "object",
+                        "properties": {
+                          "gender": { "type": "string" },
+                          "uri": { "type": "string", "format": "uri" },
+                          "pId": { "type": "string" },
+                          "firstName": { "type": "string" },
+                          "lastName": { "type": "string" },
+                          "image": { "type": "boolean" },
+                          "wikiTitle": { "type": "string" },
+                          "memberships": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "membership": {
+                                  "type": "object",
+                                  "properties": {
+                                    "house": {
+                                      "type": "object",
+                                      "properties": {
+                                        "uri": { "type": "string", "format": "uri" },
+                                        "houseCode": { "type": "string" },
+                                        "houseNo": { "type": "string" },
+                                        "chamberType": { "type": "string" },
+                                        "showAs": { "type": "string" }
+                                      }
+                                    },
+                                    "represents": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "represent": {
+                                            "type": "object",
+                                            "properties": {
+                                              "representCode": { "type": "string" },
+                                              "uri": { "type": "string", "format": "uri" },
+                                              "representType": { "type": "string" },
+                                              "showAs": { "type": "string" }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "uri": { "type": "string", "format": "uri" },
+                                    "dateRange": {
+                                      "type": "object",
+                                      "properties": {
+                                        "start": { "type": "string", "format": "date" },
+                                        "end": { "type": "string", "format": "date" }
+                                      }
+                                    },
+                                    "committees": {
+                                      "type": "array",
+                                      "items": {}
+                                    },
+                                    "parties": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "party": {
+                                            "type": "object",
+                                            "properties": {
+                                              "partyCode": { "type": "string" },
+                                              "uri": { "type": "string", "format": "uri" },
+                                              "dateRange": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "start": { "type": "string", "format": "date" },
+                                                  "end": { "type": "string", "format": "date" }
+                                                }
+                                              },
+                                              "showAs": { "type": "string" }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "offices": {
+                                      "type": "array",
+                                      "items": {}
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "dateOfDeath": { "type": "string", "format": "date" },
+                          "fullName": { "type": "string" },
+                          "memberCode": { "type": "string" },
+                          "showAs": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/parties": {
+      "x-swagger-router-controller": "parties",
+      "get": {
+        "summary": "Parties Endpoint",
+        "description": "Returns list of parties filtered by the base and additional parameters.\nThe list supports paging.\n#### Mapping\n* chamber_id - house.uri\n* chamber - house.houseCode\n* house_no - house.houseNo\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records",
+        "tags": [
+          "parties"
+        ],
+        "operationId": "parties",
+        "parameters": [
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/houseNo"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of parties and their associated house",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "partyCount": {
+                          "type": "integer",
+                          "example": 11
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 11
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "party": {
+                        "type": "object",
+                        "properties": {
+                          "partyCode": {
+                            "type": "string",
+                            "example": "Sinn_FÃ©in"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "example": "https://data.oireachtas.ie/ie/oireachtas/party/dail/31/Sinn_FÃ©in"
+                          },
+                          "showAs": {
+                            "type": "string",
+                            "example": "Sinn FÃ©in"
+                          }
+                        }
+                      },
+                      "house": {
+                        "type": "object",
+                        "properties": {
+                          "showAs": {
+                            "type": "string",
+                            "example": "31st DÃ¡il"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "example": "https://data.oireachtas.ie/ie/oireachtas/house/dail/31"
+                          },
+                          "houseCode": {
+                            "type": "string",
+                            "example": "dail"
+                          },
+                          "houseNo": {
+                            "type": "string",
+                            "example": "31"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/questions": {
+      "x-swagger-router-controller": "questions",
+      "get": {
+        "summary": "Questions Endpoint",
+        "description": "Returns list of questions filtered by the base and additional parameters.\nThe list supports paging.\n#### Mapping\n* date_start (Greater Than or Equal To) - question.date\n* date_end (Less Than or Equal To) - question.date\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records\n* qtype - question.questionType\n* member_id - question.by.uri\n* question_id - question.uri\n* question_no - question.questionNumber",
+        "tags": [
+          "questions"
+        ],
+        "operationId": "questions",
+        "parameters": [
+          {
+            "$ref": "#/parameters/dateStart"
+          },
+          {
+            "$ref": "#/parameters/dateEnd"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/questionType"
+          },
+          {
+            "$ref": "#/parameters/memberID"
+          },
+          {
+            "$ref": "#/parameters/questionID"
+          },
+          {
+            "$ref": "#/parameters/questionNo"
+          },
+          {
+            "$ref": "#/parameters/showAnswers"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "questionCount": {
+                          "type": "integer",
+                          "example": 10000
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 10000
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question": {
+                        "type": "object",
+                        "properties": {
+                          "answerText": { "type": "string" },
+                          "questionNumber": { "type": "integer" },
+                          "by": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "memberCode": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" }
+                            }
+                          },
+                          "to": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" },
+                              "roleCode": { "type": "string" },
+                              "roleType": { "type": "string" }
+                            }
+                          },
+                          "house": {
+                            "type": "object",
+                            "properties": {
+                              "uri": { "type": "string", "format": "uri" },
+                              "houseCode": { "type": "string" },
+                              "houseNo": { "type": "string" },
+                              "showAs": { "type": "string" },
+                              "chamberType": { "type": "string" },
+                              "committeeCode": { "type": "string" }
+                            }
+                          },
+                          "uri": { "type": "string", "format": "uri" },
+                          "showAs": { "type": "string" },
+                          "debateSection": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" },
+                              "formats": {
+                                "type": "object",
+                                "properties": {
+                                  "pdf": {
+                                    "type": "object",
+                                    "properties": {
+                                      "uri": { "type": "string", "format": "uri" }
+                                    }
+                                  },
+                                  "xml": {
+                                    "type": "object",
+                                    "properties": {
+                                      "uri": { "type": "string", "format": "uri" }
+                                    }
+                                  }
+                                }
+                              },
+                              "debateSectionId": { "type": "string" }
+                            }
+                          },
+                          "date": { "type": "string", "format": "date" },
+                          "questionType": { "type": "string" }
+                        }
+                      },
+                      "contextDate": { "type": "string", "format": "date" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/votes": {
+      "x-swagger-router-controller": "votes",
+      "get": {
+        "summary": "Votes Endpoint",
+        "description": "This will return a list of votes which meet certain criteria\nThe list supports paging.\n#### Mapping\n* chamber_type - division.house.chamberType\n* chamber_id - division.house.uri\n* chamber - division.house.houseCode\n* date_start (Greater Than or Equal To) - bill.mostRecentStage.event.dates.date\n* date_end (Less Than or Equal To) - bill.mostRecentStage.event.dates.date\n* skip - this will ignore the first x number of records set in the parameter\n* limit - this will only return a specific amount of records\n* outcome - division.outcome\n* member_id - division.memberTally.member.uri\n* debate_id - division.debate.uri\n* vote_id - division.uri",
+        "tags": [
+          "votes"
+        ],
+        "operationId": "votes",
+        "parameters": [
+          {
+            "$ref": "#/parameters/chamberType"
+          },
+          {
+            "$ref": "#/parameters/chamberID"
+          },
+          {
+            "$ref": "#/parameters/house"
+          },
+          {
+            "$ref": "#/parameters/dateStart"
+          },
+          {
+            "$ref": "#/parameters/dateEnd"
+          },
+          {
+            "$ref": "#/parameters/skip"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/outcome"
+          },
+          {
+            "$ref": "#/parameters/memberID"
+          },
+          {
+            "$ref": "#/parameters/debateID"
+          },
+          {
+            "$ref": "#/parameters/voteID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "divisionCount": {
+                          "type": "integer",
+                          "example": 10000
+                        },
+                        "resultCount": {
+                          "type": "integer",
+                          "example": 10000
+                        }
+                      }
+                    }
+                  }
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "contextDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "division": {
+                        "type": "object",
+                        "properties": {
+                          "isBill": { "type": "boolean" },
+                          "datetime": { "type": "string", "format": "date-time" },
+                          "voteNote": { "type": "string" },
+                          "uri": { "type": "string", "format": "uri" },
+                          "tellers": { "type": "string" },
+                          "outcome": { "type": "string" },
+                          "voteId": { "type": "string" },
+                          "category": { "type": "string" },
+                          "date": { "type": "string", "format": "date" },
+                          "chamber": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" }
+                            }
+                          },
+                          "house": {
+                            "type": "object",
+                            "properties": {
+                              "uri": { "type": "string", "format": "uri" },
+                              "houseCode": { "type": "string" },
+                              "houseNo": { "type": "string" },
+                              "showAs": { "type": "string" },
+                              "chamberType": { "type": "string" },
+                              "committeeCode": { "type": "string" }
+                            }
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" }
+                            }
+                          },
+                          "debate": {
+                            "type": "object",
+                            "properties": {
+                              "showAs": { "type": "string" },
+                              "uri": { "type": "string", "format": "uri" },
+                              "debateSection": { "type": "string" },
+                              "formats": {
+                                "type": "object",
+                                "properties": {
+                                  "pdf": {
+                                    "type": "object",
+                                    "properties": {
+                                      "uri": { "type": "string", "format": "uri" }
+                                    }
+                                  },
+                                  "xml": {
+                                    "type": "object",
+                                    "properties": {
+                                      "uri": { "type": "string", "format": "uri" }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "tallies": {
+                            "type": "object",
+                            "properties": {
+                              "nilVotes": {
+                                "type": "object",
+                                "properties": {
+                                  "showAs": { "type": "string" },
+                                  "tally": { "type": "integer" },
+                                  "members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "member": {
+                                          "type": "object",
+                                          "properties": {
+                                            "showAs": { "type": "string" },
+                                            "memberCode": { "type": "string" },
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "taVotes": {
+                                "type": "object",
+                                "properties": {
+                                  "showAs": { "type": "string" },
+                                  "tally": { "type": "integer" },
+                                  "members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "member": {
+                                          "type": "object",
+                                          "properties": {
+                                            "showAs": { "type": "string" },
+                                            "memberCode": { "type": "string" },
+                                            "uri": { "type": "string", "format": "uri" }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "staonVotes": {
+                                "type": "object",
+                                "properties": {
+                                  "member": {
+                                    "type": "object",
+                                    "properties": {
+                                      "showAs": { "type": "string" },
+                                      "memberCode": { "type": "string" },
+                                      "uri": { "type": "string", "format": "uri" }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/swagger": {
+      "x-swagger-pipe": "swagger_raw"
+    }
+  },
+  "definitions": {
+    "ErrorResponse": {
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "parameters": {
+    "lang": {
+      "name": "lang",
+      "in": "query",
+      "description": "language of document to extract. Defaults to English (en)",
+      "required": false,
+      "type": "string",
+      "enum": [
+        "ga",
+        "en"
+      ],
+      "default": "en"
+    },
+    "actYear": {
+      "name": "act_year",
+      "in": "query",
+      "description": "Filter Bill by Act year.",
+      "required": false,
+      "type": "string"
+    },
+    "actNo": {
+      "name": "act_no",
+      "in": "query",
+      "description": "Filter Bill by Act number.",
+      "required": false,
+      "type": "string"
+    },
+    "billSource": {
+      "name": "bill_source",
+      "in": "query",
+      "description": "An array used to filter legislation by origin source.",
+      "required": false,
+      "type": "array",
+      "default": [
+        "Government",
+        "Private Member"
+      ],
+      "maxItems": 2,
+      "minItems": 0,
+      "allowEmptyValue": false
+    },
+    "billStatus": {
+      "name": "bill_status",
+      "in": "query",
+      "description": "An array which is used to filter legislation by status detailed in default settings below.  Comma seperated.",
+      "required": false,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Current",
+          "Withdrawn",
+          "Enacted",
+          "Rejected",
+          "Defeated",
+          "Lapsed"
+        ]
+      },
+      "collectionFormat": "csv",
+      "default": [
+        "Current",
+        "Withdrawn",
+        "Enacted",
+        "Rejected",
+        "Defeated",
+        "Lapsed"
+      ],
+      "maxItems": 6,
+      "minItems": 0,
+      "allowEmptyValue": false
+    },
+    "billID": {
+      "name": "bill_id",
+      "in": "query",
+      "description": "Filter results by Bill uri, e.g /ie/oireachtas/act/2025/1",
+      "required": false,
+      "type": "string"
+    },
+    "billYear": {
+      "name": "bill_year",
+      "in": "query",
+      "description": "Filter Bill by year.",
+      "required": false,
+      "type": "string"
+    },
+    "billNo": {
+      "name": "bill_no",
+      "in": "query",
+      "description": "Filter Bill by number.",
+      "required": false,
+      "type": "string"
+    },
+    "outcome": {
+      "name": "outcome",
+      "in": "query",
+      "description": "Filter votes by outcome",
+      "required": false,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Carried",
+          "Lost"
+        ]
+      },
+      "collectionFormat": "csv",
+      "allowEmptyValue": true,
+      "default": [],
+      "maxItems": 2,
+      "minItems": 0
+    },
+    "questionType": {
+      "name": "qtype",
+      "in": "query",
+      "description": "Filter questions by oral or writtens.",
+      "required": false,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "oral",
+          "written"
+        ]
+      },
+      "collectionFormat": "csv",
+      "default": [
+        "oral",
+        "written"
+      ],
+      "maxItems": 2,
+      "minItems": 0
+    },
+    "showAnswers": {
+      "name": "show_answers",
+      "in": "query",
+      "description": "Add answers to the questions response",
+      "required": false,
+      "type": "boolean"
+    },
+    "memberID": {
+      "name": "member_id",
+      "in": "query",
+      "description": "Filter by Member uri, e.g. /ie/oireachtas/member/id/Brendan-Howlin.S.1983-02-23",
+      "required": false,
+      "type": "string"
+    },
+    "debateID": {
+      "name": "debate_id",
+      "in": "query",
+      "description": "Filter by debate uri, e.g. /akn/ie/debateRecord/dail/2024-11-07/debate/main",
+      "required": false,
+      "type": "string"
+    },
+    "chamberType": {
+      "name": "chamber_type",
+      "in": "query",
+      "description": "Filter results by House, ie, DÃ¡il or Seanad or committees.\n",
+      "required": false,
+      "type": "string",
+      "enum": [
+        "house",
+        "committee"
+      ]
+    },
+    "house": {
+      "name": "chamber",
+      "in": "query",
+      "description": "Filter by House name (dail or seanad).\nUsing an empty string retrieves results for both Houses.",
+      "required": false,
+      "type": "string",
+      "default": "",
+      "enum": [
+        "",
+        "dail",
+        "seanad"
+      ]
+    },
+    "chamberID": {
+      "name": "chamber_id",
+      "in": "query",
+      "description": "Filter by house or committee uri, e.g. /ie/oireachtas/house/dail/32",
+      "required": false,
+      "type": "array",
+      "collectionFormat": "csv",
+      "allowEmptyValue": true,
+      "default": []
+    },
+    "dateStart": {
+      "name": "date_start",
+      "in": "query",
+      "description": "In the format YYYY-MM-DD (e.g. 1900-12-31)",
+      "required": false,
+      "type": "string",
+      "format": "date"
+    },
+    "dateEnd": {
+      "name": "date_end",
+      "in": "query",
+      "description": "In the format YYYY-MM-DD (e.g. 2025-12-31)",
+      "required": false,
+      "type": "string",
+      "format": "date"
+    },
+    "lastUpdated": {
+      "name": "last_updated",
+      "in": "query",
+      "description": "In the format YYYY-MM-DD (e.g. 2025-12-31)",
+      "required": false,
+      "type": "string",
+      "format": "date"
+    },
+    "skip": {
+      "name": "skip",
+      "in": "query",
+      "description": "This allows skipping of records by a specific integer.",
+      "required": false,
+      "type": "integer",
+      "default": 0
+    },
+    "limit": {
+      "name": "limit",
+      "in": "query",
+      "description": "This allows the limiting of records to a specific integer.",
+      "required": false,
+      "type": "integer",
+      "default": 50
+    },
+    "houseNo": {
+      "name": "house_no",
+      "in": "query",
+      "description": "Filter by house number (integer only)",
+      "required": false,
+      "type": "integer"
+    },
+    "voteID": {
+      "name": "vote_id",
+      "in": "query",
+      "description": "Vote Identifier for a Single Vote, e.g. /ie/oireachtas/division/house/dail/34/2025-04-09/vote_43",
+      "required": false,
+      "type": "string"
+    },
+    "questionID": {
+      "name": "question_id",
+      "in": "query",
+      "description": "Identifier for a Single Question, e.g. /ie/oireachtas/question/2025-04-10/pq_1",
+      "required": false,
+      "type": "string"
+    },
+    "questionNo": {
+      "name": "question_no",
+      "in": "query",
+      "description": "Filter by question number",
+      "required": false,
+      "type": "integer"
+    },
+    "partyCode": {
+      "name": "party_code",
+      "in": "query",
+      "description": "Filter by party code, e.g. Labour_Party",
+      "required": false,
+      "type": "string"
+    },
+    "partyID": {
+      "name": "party_id",
+      "in": "query",
+      "description": "Filter by unique party identifier (uri), e.g. /ie/oireachtas/party/dail/32/Labour_Party",
+      "required": false,
+      "type": "string"
+    },
+    "constituencyCode": {
+      "name": "const_code",
+      "in": "query",
+      "description": "Filter by constituency code, e.g. Administrative-Panel",
+      "required": false,
+      "type": "string"
+    },
+    "constituencyID": {
+      "name": "const_id",
+      "in": "query",
+      "description": "Filter by unique constituency identifier (uri), e.g. /ie/oireachtas/house/seanad/26/panel/Administrative-Panel",
+      "required": false,
+      "type": "string"
+    },
+    "fuzzyNameSearch": {
+      "name": "fuzzy_name_search",
+      "in": "query",
+      "description": "Filter by name with fuzzy search (typo safe)",
+      "required": false,
+      "type": "string"
+    },
+    "fuzzyAddressSearch": {
+      "name": "fuzzy_address_search",
+      "in": "query",
+      "description": "Filter by address with fuzzy search (typo safe)",
+      "required": false,
+      "type": "string"
+    }
+  }
+}
+

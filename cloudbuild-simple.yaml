@@ -1,0 +1,32 @@
+# Simple force deployment with unique tag
+steps:
+  # Build Frontend with BUILD_ID
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend:${BUILD_ID}'
+      - '.'
+
+  # Push image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/parliament-frontend:${BUILD_ID}']
+
+  # Deploy Frontend to Cloud Run forcing new revision
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'parliament-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend:${BUILD_ID}'
+      - '--region'
+      - 'us-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'

@@ -1,0 +1,125 @@
+# Google Cloud Build Configuration for Parliament Explorer
+# This file defines the multi-step build and deployment process
+
+steps:
+  # Step 1: Build the Backend API (Node.js + TypeScript)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/parliament-api:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/parliament-api:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
+      - './cloud-run-api'
+    waitFor: ['-']
+
+  # Step 2: Build the Frontend (React + Vite)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
+      - '.'
+    waitFor: ['-']
+
+  # Step 3: Push Backend Image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/parliament-api'
+    waitFor: ['build-backend']
+
+  # Step 4: Push Frontend Image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend'
+    waitFor: ['build-frontend']
+
+  # Step 5: Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-backend'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'parliament-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/parliament-api:$BUILD_ID'
+      - '--region'
+      - 'us-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,SINGLE_USER_MODE=true'
+      - '--set-secrets'
+      - 'GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,MICROSOFT_CLIENT_ID=microsoft-client-id:latest,MICROSOFT_CLIENT_SECRET=microsoft-client-secret:latest,MICROSOFT_TENANT_ID=microsoft-tenant-id:latest,JWT_SECRET=jwt-secret:latest,ALLOWED_EMAILS=allowed-emails:latest'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '100'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '300'
+    waitFor: ['push-backend']
+
+  # Step 6: Deploy Frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-frontend'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'parliament-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/parliament-frontend:$BUILD_ID'
+      - '--region'
+      - 'us-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '80'
+      - '--max-instances'
+      - '5'
+      - '--timeout'
+      - '60'
+      - '--port'
+      - '80'
+    waitFor: ['push-frontend']
+
+# Build options for performance and caching
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+  dynamic_substitutions: true
+  logging: CLOUD_LOGGING_ONLY
+
+# Build timeout (30 minutes)
+timeout: '1800s'
+
+# Tags for organization
+tags:
+  - 'parliament-explorer'
+  - 'oauth-authentication'
+  - 'cloud-run'

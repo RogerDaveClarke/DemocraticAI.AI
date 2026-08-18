@@ -1,0 +1,13 @@
+{
+  "name": "photo-server",
+  "version": "1.0.0", 
+  "description": "Simple server to serve member photos",
+  "main": "photo-server.js",
+  "scripts": {
+    "start": "node photo-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}

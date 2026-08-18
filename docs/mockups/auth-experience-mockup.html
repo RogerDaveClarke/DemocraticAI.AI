@@ -1,0 +1,397 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auth Experience Mockup — Parliament AI</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy-950:#0b1f3a;--navy-900:#0d3b66;--navy-800:#1b3a5c;--navy-100:#d8e3ef;
+      --teal-600:#14b8a6;--teal-500:#2dd4bf;--teal-100:#dbf5f3;
+      --canvas:#f8fafc;--border:#e2e8f0;--ink:#0f172a;--slate:#64748b;
+      --slate-100:#f1f5f9;--red-50:#fef2f2;--amber-50:#fffbeb;--amber-400:#fbbf24;
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--canvas);color:var(--ink);min-height:100vh}
+
+    /* nav */
+    .nav-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:#fff;padding:0 24px}
+    .nav-tab{padding:12px 18px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--slate);transition:all .15s}
+    .nav-tab:hover{color:var(--ink)}
+    .nav-tab.active{border-bottom-color:var(--teal-600);color:var(--teal-600)}
+    .label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);text-align:center;padding:6px 0 20px}
+
+    /* screens */
+    .screen{display:none;padding:40px 24px;max-width:1100px;margin:0 auto}
+    .screen.active{display:block}
+
+    /* ── Sign-in ── */
+    .signin-wrap{display:flex;align-items:center;justify-content:center;min-height:70vh}
+    .signin-card{width:400px;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07)}
+    .signin-header{background:linear-gradient(135deg,var(--navy-950),var(--navy-800));padding:28px 32px;text-align:center}
+    .signin-logo{width:44px;height:44px;background:var(--teal-600);border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
+    .signin-logo svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2}
+    .signin-title{color:#fff;font-size:18px;font-weight:700;margin-bottom:4px}
+    .signin-sub{color:rgba(255,255,255,.6);font-size:12px}
+    .signin-body{padding:28px 32px}
+    .field-label{font-size:11px;font-weight:600;color:var(--ink);margin-bottom:6px;display:block}
+    .field-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink);background:var(--canvas);margin-bottom:14px}
+    .field-input:focus{outline:none;border-color:var(--teal-600);box-shadow:0 0 0 3px rgba(20,184,166,.1)}
+    .btn-primary-full{width:100%;padding:10px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px}
+    .btn-divider{text-align:center;font-size:11px;color:var(--slate);margin-bottom:12px;position:relative}
+    .btn-divider::before,.btn-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+    .btn-divider::before{left:0} .btn-divider::after{right:0}
+    .btn-google{width:100%;padding:9px;background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+    .btn-google svg{width:16px;height:16px}
+    .signin-note{margin-top:20px;text-align:center;font-size:11px;color:var(--slate)}
+    .signin-note a{color:var(--teal-600)}
+
+    /* ── Access restricted ── */
+    .restricted-wrap{display:flex;align-items:center;justify-content:center;min-height:70vh}
+    .restricted-card{width:440px;background:#fff;border:1px solid var(--border);border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.07)}
+    .restricted-icon{width:56px;height:56px;background:var(--amber-50);border:1px solid #fde68a;border-radius:16px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center}
+    .restricted-icon svg{width:26px;height:26px;stroke:var(--amber-400);fill:none;stroke-width:1.8}
+    .restricted-title{font-size:18px;font-weight:700;margin-bottom:8px}
+    .restricted-body{font-size:13px;color:var(--slate);line-height:1.6;margin-bottom:20px}
+    .restricted-email{font-size:12px;color:var(--slate);padding:8px 12px;background:var(--slate-100);border-radius:8px;margin-bottom:24px}
+    .btn-ghost-sm{padding:8px 20px;border:1px solid var(--border);background:#fff;border-radius:8px;font-size:12px;color:var(--slate);cursor:pointer}
+
+    /* ── App shell ── */
+    .app-shell{display:flex;flex-direction:column;height:calc(100vh - 90px);min-height:560px}
+    .app-topbar{background:linear-gradient(135deg,var(--navy-950),var(--navy-800));padding:12px 20px;display:flex;align-items:center;gap:12px}
+    .app-wordmark{color:#fff;font-size:14px;font-weight:700;letter-spacing:-.01em}
+    .app-wordmark span{color:var(--teal-500)}
+    .app-topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+    .user-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 10px 4px 6px;cursor:pointer}
+    .user-avatar{width:22px;height:22px;border-radius:50%;background:var(--teal-600);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700}
+    .user-name{font-size:11px;color:rgba(255,255,255,.85);font-weight:500}
+    .quota-badge{font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+    .quota-badge.warn{background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.3);color:#fbbf24}
+    .admin-badge{font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(20,184,166,.2);border:1px solid rgba(20,184,166,.35);color:var(--teal-400,#2dd4bf)}
+    .app-sidebar{display:flex;gap:0}
+    .sidebar{width:220px;border-right:1px solid var(--border);background:#fff;padding:12px 0;flex-shrink:0}
+    .sidebar-item{display:flex;align-items:center;gap:8px;padding:9px 16px;font-size:12px;color:var(--slate);cursor:pointer;border-radius:0;transition:background .12s}
+    .sidebar-item:hover{background:var(--slate-100)}
+    .sidebar-item.active{color:var(--teal-600);background:var(--teal-100);font-weight:500}
+    .sidebar-item svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+    .sidebar-divider{height:1px;background:var(--border);margin:8px 0}
+    .sidebar-item.admin-item{color:var(--navy-900)}
+    .content-area{flex:1;background:var(--canvas);padding:20px;overflow-y:auto}
+    .content-placeholder{border:1px dashed var(--border);border-radius:12px;padding:40px;text-align:center;color:var(--slate);font-size:13px}
+
+    /* ── Admin panel ── */
+    .admin-header{margin-bottom:24px}
+    .admin-header h2{font-size:18px;font-weight:700;margin-bottom:4px}
+    .admin-header p{font-size:12px;color:var(--slate)}
+    .admin-section{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden}
+    .admin-section-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:between;gap:8px}
+    .admin-section-title{font-size:13px;font-weight:600}
+    .admin-section-body{padding:16px 20px}
+    .flag-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+    .flag-row:last-child{border-bottom:none}
+    .flag-name{font-size:12px;font-weight:600;color:var(--ink);min-width:200px;font-family:monospace}
+    .flag-desc{font-size:11px;color:var(--slate);flex:1}
+    .toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-track{position:absolute;inset:0;background:var(--border);border-radius:20px;cursor:pointer;transition:background .2s}
+    .toggle input:checked + .toggle-track{background:var(--teal-600)}
+    .toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none}
+    .toggle input:checked ~ .toggle-thumb{transform:translateX(16px)}
+    .quota-input{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;width:60px;text-align:center}
+    .users-table{width:100%;border-collapse:collapse;font-size:12px}
+    .users-table th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--slate);padding:0 12px 10px 0}
+    .users-table td{padding:8px 12px 8px 0;border-top:1px solid var(--border);vertical-align:middle}
+    .status-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px}
+    .status-dot.active{background:#22c55e}
+    .status-dot.disabled{background:#ef4444}
+    .usage-bar-wrap{width:80px;height:6px;background:var(--slate-100);border-radius:3px;overflow:hidden}
+    .usage-bar{height:100%;border-radius:3px;background:var(--teal-600)}
+    .usage-bar.warn{background:var(--amber-400)}
+    .btn-danger-sm{padding:4px 10px;border:1px solid #fecaca;background:var(--red-50);color:#ef4444;border-radius:6px;font-size:11px;cursor:pointer}
+    .add-user-row{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+    .add-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px}
+    .btn-teal-sm{padding:7px 14px;background:var(--teal-600);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+
+<div class="nav-tabs">
+  <div class="nav-tab active" onclick="show('signin')">1. Sign-in</div>
+  <div class="nav-tab" onclick="show('restricted')">2. Access Restricted</div>
+  <div class="nav-tab" onclick="show('user')">3. Regular User Session</div>
+  <div class="nav-tab" onclick="show('admin')">4. Admin Panel</div>
+</div>
+
+<!-- 1. Sign-in -->
+<div class="screen active" id="screen-signin">
+  <div class="label">Sign-in page — shown to all unauthenticated visitors</div>
+  <div class="signin-wrap">
+    <div class="signin-card">
+      <div class="signin-header">
+        <div class="signin-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="signin-title">Parliament AI</div>
+        <div class="signin-sub">Research platform for democratic institutions</div>
+      </div>
+      <div class="signin-body">
+        <label class="field-label">Email address</label>
+        <input class="field-input" type="email" placeholder="you@example.com" />
+        <label class="field-label">Password</label>
+        <input class="field-input" type="password" placeholder="••••••••" />
+        <button class="btn-primary-full" onclick="show('user')">Sign in</button>
+        <div class="btn-divider">or</div>
+        <button class="btn-google" onclick="show('user')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+        <div class="signin-note">Access is by invitation only. <a href="#">Request access</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Access restricted -->
+<div class="screen" id="screen-restricted">
+  <div class="label">Access restricted — shown when a Google account is not provisioned</div>
+  <div class="restricted-wrap">
+    <div class="restricted-card">
+      <div class="restricted-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h2 class="restricted-title">Access not provisioned</h2>
+      <p class="restricted-body">Parliament AI is available by invitation only. Your account has not been granted access to this platform.</p>
+      <div class="restricted-email">Signed in as: someone@example.com</div>
+      <p class="restricted-body" style="font-size:11px;margin-bottom:24px">If you believe this is an error, contact the platform administrator to request access.</p>
+      <button class="btn-ghost-sm">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Regular user session -->
+<div class="screen" id="screen-user">
+  <div class="label">Regular user — authenticated, quota indicator visible in top bar</div>
+  <div class="app-shell">
+    <div class="app-topbar">
+      <svg width="22" height="22" viewBox="0 0 24 24" style="stroke:#fff;fill:none;stroke-width:2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="app-wordmark">Parliament<span> AI</span></span>
+      <div class="app-topbar-right">
+        <span class="quota-badge">38 / 50 queries today</span>
+        <div class="user-chip">
+          <div class="user-avatar">JB</div>
+          <span class="user-name">Jane Byrne</span>
+        </div>
+      </div>
+    </div>
+    <div class="app-sidebar" style="flex:1;overflow:hidden">
+      <div class="sidebar">
+        <div class="sidebar-item active">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Research
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Officials
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          Debates
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Bills
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item" style="font-size:11px;color:var(--slate)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          About
+        </div>
+        <div class="sidebar-item" style="font-size:11px;color:#ef4444">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="content-placeholder">
+          Research Assistant content renders here<br/>
+          <span style="font-size:11px;color:var(--slate);display:block;margin-top:6px">Quota badge in top bar shows remaining queries. At 80% a warning colour is shown.</span>
+        </div>
+        <!-- quota warning example -->
+        <div style="margin-top:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" style="stroke:#d97706;fill:none;stroke-width:2;flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>You have used 38 of your 50 daily queries. Your limit resets at midnight UTC.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. Admin panel -->
+<div class="screen" id="screen-admin">
+  <div class="label">Admin panel — /admin route, visible only when admin custom claim is present</div>
+  <div class="app-shell">
+    <div class="app-topbar">
+      <svg width="22" height="22" viewBox="0 0 24 24" style="stroke:#fff;fill:none;stroke-width:2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="app-wordmark">Parliament<span> AI</span></span>
+      <div class="app-topbar-right">
+        <span class="admin-badge">Admin</span>
+        <div class="user-chip">
+          <div class="user-avatar" style="background:var(--navy-800)">RC</div>
+          <span class="user-name">Roger Clarke</span>
+        </div>
+      </div>
+    </div>
+    <div class="app-sidebar" style="flex:1;overflow:hidden">
+      <div class="sidebar">
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Research
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Officials
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          Debates
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item active admin-item">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Admin
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item" style="font-size:11px;color:#ef4444">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </div>
+      </div>
+
+      <div class="content-area">
+        <div class="admin-header">
+          <h2>Platform Admin</h2>
+          <p>Manage feature flags, users, and quota. Changes to feature flags propagate to clients within the Remote Config poll interval (12 h in production).</p>
+        </div>
+
+        <!-- Feature flags -->
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <span class="admin-section-title">Feature Flags</span>
+          </div>
+          <div class="admin-section-body">
+            <div class="flag-row">
+              <span class="flag-name">ff_access_feedback</span>
+              <span class="flag-desc">Feedback controls on Research page (thumbs + panel)</span>
+              <label class="toggle">
+                <input type="checkbox" checked onchange="this.closest('.flag-row').querySelector('.flag-state').textContent=this.checked?'ON':'OFF'">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+              <span class="flag-state" style="font-size:11px;font-weight:600;color:var(--teal-600);min-width:24px">ON</span>
+            </div>
+            <div class="flag-row">
+              <span class="flag-name">ff_access_analytics_page</span>
+              <span class="flag-desc">Analytics dashboard visible in navigation</span>
+              <label class="toggle">
+                <input type="checkbox" onchange="this.closest('.flag-row').querySelector('.flag-state').textContent=this.checked?'ON':'OFF'">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+              <span class="flag-state" style="font-size:11px;font-weight:600;color:var(--slate);min-width:24px">OFF</span>
+            </div>
+            <div class="flag-row">
+              <span class="flag-name">ff_quota_daily_limit</span>
+              <span class="flag-desc">Maximum queries per user per day</span>
+              <input class="quota-input" type="number" value="50" min="1" max="500" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Users -->
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <span class="admin-section-title">Users</span>
+          </div>
+          <div class="admin-section-body">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Created</th>
+                  <th>Last sign-in</th>
+                  <th>Status</th>
+                  <th>Usage today</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Roger Clarke</strong><br/><span style="font-size:10px;color:var(--teal-600)">Admin</span></td>
+                  <td style="color:var(--slate)">rogerdaveclarke@gmail.com</td>
+                  <td style="color:var(--slate)">2025-01-15</td>
+                  <td style="color:var(--slate)">Today</td>
+                  <td><span class="status-dot active"></span>Active</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="usage-bar-wrap"><div class="usage-bar" style="width:16%"></div></div>
+                      <span style="font-size:10px;color:var(--slate)">8 / 50</span>
+                    </div>
+                  </td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td><strong>Jane Byrne</strong></td>
+                  <td style="color:var(--slate)">jane.byrne@research.ie</td>
+                  <td style="color:var(--slate)">2026-07-20</td>
+                  <td style="color:var(--slate)">Today</td>
+                  <td><span class="status-dot active"></span>Active</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="usage-bar-wrap"><div class="usage-bar warn" style="width:76%"></div></div>
+                      <span style="font-size:10px;color:#d97706">38 / 50</span>
+                    </div>
+                  </td>
+                  <td><button class="btn-danger-sm">Remove</button></td>
+                </tr>
+                <tr>
+                  <td><strong>Ciaran Murphy</strong></td>
+                  <td style="color:var(--slate)">c.murphy@oireachtas.ie</td>
+                  <td style="color:var(--slate)">2026-08-01</td>
+                  <td style="color:var(--slate)">3 days ago</td>
+                  <td><span class="status-dot active"></span>Active</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="usage-bar-wrap"><div class="usage-bar" style="width:4%"></div></div>
+                      <span style="font-size:10px;color:var(--slate)">2 / 50</span>
+                    </div>
+                  </td>
+                  <td><button class="btn-danger-sm">Remove</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="add-user-row">
+              <input class="add-input" type="email" placeholder="Email address" />
+              <input class="add-input" type="text" placeholder="Display name" />
+              <button class="btn-teal-sm">Add user</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    const tabs = ['signin','restricted','user','admin'];
+    document.querySelectorAll('.nav-tab')[tabs.indexOf(id)].classList.add('active');
+  }
+</script>
+</body>
+</html>

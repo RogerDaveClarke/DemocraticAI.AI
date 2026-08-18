@@ -1,0 +1,22 @@
+{
+  "name": "oireachtas-data-ingestion",
+  "version": "1.0.0",
+  "description": "Local script to ingest Oireachtas data into Firestore",
+  "main": "ingest-data.js",
+  "scripts": {
+    "ingest": "node ingest-data.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.1.0",
+    "@google-cloud/storage": "^7.17.2",
+    "firebase-admin": "^13.5.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
