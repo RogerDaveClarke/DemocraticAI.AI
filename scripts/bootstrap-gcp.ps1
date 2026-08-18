@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$ProjectId,
 
@@ -76,6 +76,8 @@ function Ensure-Project() {
     } else {
         Ok "Project exists"
     }
+
+    gcloud auth application-default set-quota-project $ProjectId | Out-Null
 
     if ($BillingAccount -ne "") {
         Info "Linking billing account"
@@ -437,3 +439,4 @@ VITE_API_BASE_URL=$apiUrl
 }
 
 Main
+
