@@ -15,6 +15,7 @@ Prerequisites:
 
 import argparse
 import logging
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -35,15 +36,16 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 PROJECT_ID   = os.environ["GOOGLE_CLOUD_PROJECT"]
-DATASET_ID   = "parliamentary_data"
-LOCATION     = "US"
-API_BASE     = "https://api.oireachtas.ie/v1"
+DATASET_ID   = os.getenv("BQ_DATASET", "parliamentary_data")
+LOCATION     = os.getenv("BQ_LOCATION", "US")
+API_BASE     = os.getenv("PARLIAMENT_API_BASE_URL", "https://api.oireachtas.ie/v1")
 DATA_BASE    = "https://data.oireachtas.ie"
 AKN_NS       = {"akn": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0/CSD13"}
 DEFAULT_DATE = "2020-01-01"          # absolute floor for full-refresh
 API_PAGE_SIZE = 50                   # Oireachtas API max page size
 API_SLEEP     = 0.15                 # seconds between pages (rate-limit courtesy)
 XML_SLEEP     = 0.25                 # seconds between XML fetches
+PARLIAMENT_ADAPTER = os.getenv("PARLIAMENT_ADAPTER", "oireachtas").lower()
 
 
 # ── BigQuery table schemas ─────────────────────────────────────────────────────
@@ -519,6 +521,12 @@ def ingest_members(bq: BQManager) -> int:
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main() -> None:
+    if PARLIAMENT_ADAPTER != "oireachtas":
+        raise NotImplementedError(
+            f"Adapter '{PARLIAMENT_ADAPTER}' is not implemented yet. "
+            "Current ingestion supports PARLIAMENT_ADAPTER=oireachtas only."
+        )
+
     parser = argparse.ArgumentParser(description="Ingest Oireachtas data into BigQuery")
     parser.add_argument("--full-refresh",  action="store_true",
                         help="Reload everything from DEFAULT_DATE to today")
