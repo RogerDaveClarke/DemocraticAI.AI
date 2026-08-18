@@ -31,6 +31,17 @@ info() { echo "[INFO] $*"; }
 ok() { echo "[OK] $*"; }
 warn() { echo "[WARN] $*"; }
 
+wait_service_account() {
+  local email="$1"
+  for attempt in $(seq 1 20); do
+    if gcloud iam service-accounts describe "$email" --project="$PROJECT_ID" >/dev/null 2>&1; then
+      return 0
+    fi
+    [[ "$attempt" -eq 20 ]] && return 1
+    sleep 1
+  done
+}
+
 need_cmd gcloud
 need_cmd bq
 need_cmd jq
@@ -144,6 +155,7 @@ info "Ensuring API runtime service account"
 API_SA="parliament-api-sa@$PROJECT_ID.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$API_SA" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam service-accounts create parliament-api-sa --project="$PROJECT_ID" --display-name="Parliament API Runtime"
+  wait_service_account "$API_SA"
 fi
 for role in roles/aiplatform.user roles/bigquery.dataViewer roles/bigquery.jobUser roles/datastore.user roles/firebaseauth.admin roles/firebase.remoteConfigAdmin roles/logging.logWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$API_SA" --role="$role" >/dev/null
@@ -212,6 +224,7 @@ info "Ensuring ingestion service account"
 JOB_SA="parliament-ingestion-sa@$PROJECT_ID.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$JOB_SA" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam service-accounts create parliament-ingestion-sa --project="$PROJECT_ID" --display-name="Parliament Ingestion SA"
+  wait_service_account "$JOB_SA"
 fi
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$JOB_SA" --role="roles/bigquery.dataEditor" >/dev/null
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$JOB_SA" --role="roles/bigquery.jobUser" >/dev/null
@@ -245,6 +258,7 @@ fi
 SCHED_SA="parliament-scheduler-sa@$PROJECT_ID.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$SCHED_SA" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam service-accounts create parliament-scheduler-sa --project="$PROJECT_ID" --display-name="Parliament Scheduler SA"
+  wait_service_account "$SCHED_SA"
 fi
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SCHED_SA" --role="roles/run.admin" >/dev/null
 

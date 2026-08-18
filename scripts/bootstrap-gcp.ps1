@@ -61,6 +61,18 @@ function Ensure-ApiEnabled([string[]]$apis) {
     }
 }
 
+function Wait-ServiceAccount([string]$email) {
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            gcloud iam service-accounts describe $email --project=$ProjectId | Out-Null
+            return
+        } catch {
+            if ($attempt -eq 20) { throw }
+            [System.Threading.Thread]::Sleep(1500)
+        }
+    }
+}
+
 function Ensure-Project() {
     Info "Ensuring GCP project exists: $ProjectId"
     $exists = $true
@@ -343,6 +355,7 @@ function Main() {
         gcloud iam service-accounts describe $apiSaEmail --project=$ProjectId | Out-Null
     } catch {
         gcloud iam service-accounts create $apiSaName --project=$ProjectId --display-name="Parliament API Runtime" | Out-Null
+        Wait-ServiceAccount $apiSaEmail
     }
     @(
         "roles/aiplatform.user",
@@ -414,6 +427,7 @@ VITE_API_BASE_URL=$apiUrl
         gcloud iam service-accounts describe $jobSaEmail --project=$ProjectId | Out-Null
     } catch {
         gcloud iam service-accounts create $jobSaName --project=$ProjectId --display-name="Parliament Ingestion SA" | Out-Null
+        Wait-ServiceAccount $jobSaEmail
     }
 
     gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$jobSaEmail" --role="roles/bigquery.dataEditor" | Out-Null
@@ -430,6 +444,7 @@ VITE_API_BASE_URL=$apiUrl
         gcloud iam service-accounts describe $schedulerSaEmail --project=$ProjectId | Out-Null
     } catch {
         gcloud iam service-accounts create $schedulerSaName --project=$ProjectId --display-name="Parliament Scheduler SA" | Out-Null
+        Wait-ServiceAccount $schedulerSaEmail
     }
 
     gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$schedulerSaEmail" --role="roles/run.admin" | Out-Null
