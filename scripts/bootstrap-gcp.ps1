@@ -78,8 +78,14 @@ function Ensure-Project() {
     }
 
     if ($BillingAccount -ne "") {
-        Info "Linking billing account"
-        gcloud billing projects link $ProjectId --billing-account=$BillingAccount | Out-Null
+        $billingInfo = gcloud beta billing projects describe $ProjectId --format=json | ConvertFrom-Json
+        $expectedBillingAccount = "billingAccounts/$BillingAccount"
+        if ($billingInfo.billingEnabled -and $billingInfo.billingAccountName -eq $expectedBillingAccount) {
+            Ok "Billing account already linked"
+        } else {
+            Info "Linking billing account"
+            gcloud billing projects link $ProjectId --billing-account=$BillingAccount | Out-Null
+        }
     } else {
         Warn "No billing account supplied. Ensure billing is linked or deployments may fail."
     }

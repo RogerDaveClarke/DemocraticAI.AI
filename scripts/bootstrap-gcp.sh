@@ -51,7 +51,12 @@ fi
 gcloud config set project "$PROJECT_ID" >/dev/null
 
 if [[ -n "$BILLING_ACCOUNT" ]]; then
-  gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
+  CURRENT_BILLING_ACCOUNT="$(gcloud beta billing projects describe "$PROJECT_ID" --format='value(billingAccountName)')"
+  if [[ "$CURRENT_BILLING_ACCOUNT" == "billingAccounts/$BILLING_ACCOUNT" ]]; then
+    ok "Billing account already linked"
+  else
+    gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
+  fi
 else
   warn "No BILLING_ACCOUNT supplied. Ensure billing is linked or deploy may fail."
 fi
