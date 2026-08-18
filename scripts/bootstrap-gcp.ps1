@@ -77,14 +77,14 @@ function Ensure-Project() {
         Ok "Project exists"
     }
 
-    gcloud auth application-default set-quota-project $ProjectId | Out-Null
-
     if ($BillingAccount -ne "") {
         Info "Linking billing account"
         gcloud billing projects link $ProjectId --billing-account=$BillingAccount | Out-Null
     } else {
         Warn "No billing account supplied. Ensure billing is linked or deployments may fail."
     }
+
+    gcloud auth application-default set-quota-project $ProjectId | Out-Null
 }
 
 function Wait-FirebaseOperation([string]$operationName, [hashtable]$headers) {
@@ -439,4 +439,5 @@ VITE_API_BASE_URL=$apiUrl
 }
 
 Main
+
 
