@@ -39,7 +39,7 @@ jobs:
 
       # Step 5: Scan repository for leaked Google/Firebase Secrets
       - name: Secret Detection (TruffleHog)
-        uses: trufflesecurity/trufflehog-oss-action@main
+        uses: trufflesecurity/trufflehog@main
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
