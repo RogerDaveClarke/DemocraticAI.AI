@@ -163,7 +163,7 @@ Admin account will be exempt.
 
 ## Open security items
 
-See `security/security_review_08-12-2026.md` for the full findings list.
+Security findings should be tracked in the issue tracker and deployment checklist rather than committed review artifacts.
 
 Priority fixes pending before public launch:
 
@@ -174,3 +174,4 @@ Priority fixes pending before public launch:
 | H-1 | `trust proxy` not set — rate limiting broken at scale |
 | H-3 | Firebase ID token stored in `sessionStorage` — remove the line |
 | M-2 | `APIUsageMonitor` writes `undefined` to Firestore on every request |
+

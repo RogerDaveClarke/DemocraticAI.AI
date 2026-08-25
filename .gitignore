@@ -35,6 +35,8 @@ dist-ssr
 *.jks
 secrets.json
 credentials.json
+SECURITY_*.md
+/security/
 
 # Terraform state files
 *.tfstate
@@ -44,3 +46,6 @@ credentials.json
 
 __pycache__/
 *.pyc
+
+gitleaks-report*.json
+
