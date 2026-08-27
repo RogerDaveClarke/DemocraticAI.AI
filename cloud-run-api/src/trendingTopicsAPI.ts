@@ -8,6 +8,10 @@ import NodeCache from 'node-cache';
 
 const router = express.Router();
 
+function neutralizeLogValue(value: unknown): string {
+  return String(value).replace(/[\r\n\t\u0000-\u001f\u007f-\u009f]/g, ' ');
+}
+
 // Initialize services
 // const db = new Firestore();
 // const vertexAI = new VertexAI({ project: process.env.GOOGLE_CLOUD_PROJECT, location: 'us-central1' });
@@ -100,7 +104,7 @@ router.get('/trending-topics/:id', async (req: Request, res: Response) => {
     
     return res.json(topicDetail);
   } catch (error) {
-    console.error(`Error fetching topic ${req.params.id}:`, error);
+    console.error(`Error fetching topic ${neutralizeLogValue(req.params.id)}:`, error);
     return res.status(500).json({ error: 'Failed to fetch topic details' });
   }
 });

@@ -338,12 +338,16 @@ interface MembersResponse {
 }
 
 // Utility functions
+const neutralizeLogValue = (value: unknown): string => {
+  return String(value).replace(/[\r\n\t\u0000-\u001f\u007f-\u009f]/g, ' ');
+};
+
 const logError = (message: string, error: any) => {
-  console.error(`[ERROR] ${message}:`, error);
+  console.error(`[ERROR] ${neutralizeLogValue(message)}:`, error);
 };
 
 const logInfo = (message: string) => {
-  console.log(`[INFO] ${message}`);
+  console.log(`[INFO] ${neutralizeLogValue(message)}`);
 };
 
 // Cache keys
