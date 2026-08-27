@@ -131,7 +131,7 @@ function getUserIdentifier(): string {
   
   if (!userId) {
     // Generate a unique identifier for this session
-    userId = `user_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    userId = `user_${Date.now()}_${crypto.randomUUID()}`;
     sessionStorage.setItem('user_encryption_id', userId);
   }
   
