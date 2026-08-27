@@ -17,34 +17,14 @@ async function resendEmail(to: string, subject: string, html: string): Promise<v
   console.log("[email] Sent to", to);
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function supportEmailLink(): string {
-  const email = process.env.SUPPORT_EMAIL ?? 'support@democraticai.ai';
-  if (!/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(email)) {
-    throw new Error('SUPPORT_EMAIL must be a valid email address');
-  }
-
-  const escapedEmail = escapeHtml(email);
-  return `<a href="mailto:${encodeURIComponent(email)}">${escapedEmail}</a>`;
-}
-
 async function sendRejectionEmail(toEmail: string): Promise<void> {
   await resendEmail(toEmail, "Your Parliament AI access request",
-    `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Access request update</h2><p>Thank you for your interest in Parliament AI. After reviewing your request, we are unable to approve access at this time.</p><p>If you believe this is an error, please contact ${supportEmailLink()}.</p></div>`
+    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Access request update</h2><p>Thank you for your interest in Parliament AI. After reviewing your request, we are unable to approve access at this time.</p><p>If you believe this is an error, please contact support.</p></div>'
   );
 }
-async function sendSuspensionEmail(toEmail: string, displayName: string): Promise<void> {
-  const name = escapeHtml(displayName || toEmail.split("@")[0]);
+async function sendSuspensionEmail(toEmail: string, _displayName: string): Promise<void> {
   await resendEmail(toEmail, "Your Parliament AI account has been suspended",
-    `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Account suspended</h2><p>Hi ${name},</p><p>Your Parliament AI account has been suspended. You will not be able to sign in until your account is reactivated.</p><p>If you believe this is an error, please contact ${supportEmailLink()}.</p></div>`
+    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Account suspended</h2><p>Your Parliament AI account has been suspended. You will not be able to sign in until your account is reactivated.</p><p>If you believe this is an error, please contact support.</p></div>'
   );
 }
 
