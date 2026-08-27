@@ -30,7 +30,7 @@ async function sendSuspensionEmail(toEmail: string, displayName: string): Promis
 
 
 if (!adminGetApps().length) {
-  adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT! });
+  adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 }
 
 const db = new Firestore();

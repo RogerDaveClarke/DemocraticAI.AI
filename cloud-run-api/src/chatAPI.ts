@@ -14,7 +14,7 @@ import { NextFunction } from 'express';
 
 // Initialise the Admin SDK once; Cloud Run's service account provides credentials automatically.
 if (!adminGetApps().length) {
-  adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT! });
+  adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 }
 
 async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {

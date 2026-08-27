@@ -5,11 +5,16 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth, UserRecord } from 'firebase-admin/auth';
 
 if (!getApps().length) {
-  initializeApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT! });
+  initializeApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 }
 
 const db = new Firestore();
 const genericResponse = { message: 'If this email has an approved account, a sign-in link has been sent.' };
+
+function authTrace(message: string, details: Record<string, unknown> = {}): void {
+  if (process.env.NODE_ENV !== 'development') return;
+  console.info('[auth-trace]', message, details);
+}
 
 const emailLinkLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -56,6 +61,8 @@ export async function sendPasswordlessEmail(
     const body = await response.text();
     throw new Error(`Firebase email error ${response.status}: ${body}`);
   }
+
+  authTrace('firebase-email-accepted');
 }
 
 async function approvedUser(email: string): Promise<UserRecord | null> {
@@ -63,20 +70,34 @@ async function approvedUser(email: string): Promise<UserRecord | null> {
   try {
     user = await getAuth().getUserByEmail(email);
   } catch {
+    authTrace('user-not-found');
     return null;
   }
 
-  if (user.disabled) return null;
-  if (user.customClaims?.admin === true || user.customClaims?.approved === true) return user;
+  if (user.disabled) {
+    authTrace('user-disabled');
+    return null;
+  }
+  if (user.customClaims?.admin === true || user.customClaims?.approved === true) {
+    authTrace('user-approved-by-claim', {
+      admin: user.customClaims?.admin === true,
+      approved: user.customClaims?.approved === true,
+    });
+    return user;
+  }
 
   const approvedRequest = await db.collection('access_requests')
     .where('email', '==', email)
     .where('status', '==', 'approved')
     .limit(1)
     .get();
-  if (approvedRequest.empty) return null;
+  if (approvedRequest.empty) {
+    authTrace('user-not-approved');
+    return null;
+  }
 
   await getAuth().setCustomUserClaims(user.uid, { ...user.customClaims, approved: true });
+  authTrace('user-approved-by-request');
   return user;
 }
 

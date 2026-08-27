@@ -1,5 +1,4 @@
-﻿import { useState, lazy, Suspense, useEffect } from 'react';
-import StarterPage from './components/StarterPage';
+import { useState, lazy, Suspense, useEffect } from 'react';
 import AppSidebar from './components/AppSidebar';
 import AppHeader from './components/AppHeader';
 import { SkipNavigation } from './components/accessibility/AccessibilityComponents';
@@ -169,12 +168,6 @@ function App() {
     return <MfaEnrollModal user={user} onComplete={() => signOut(auth)} />;
   }
 
-  const handleEnterTracker = () => {
-    window.history.pushState({}, '', '/home');
-    setPathname('/home');
-    event('enter_tracker', 'navigation', 'Enter Tracker Button');
-  };
-
   const handleBackToHome = () => {
     window.history.pushState({}, '', '/home');
     setPathname('/home');
@@ -340,10 +333,6 @@ function App() {
       )}
     </div>
   );
-
-  if (pathname === '/') {
-    return <StarterPage onEnterTracker={handleEnterTracker} />;
-  }
 
   return trackerShell;
 }
