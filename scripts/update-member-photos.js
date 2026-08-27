@@ -34,7 +34,7 @@ async function downloadMemberPhoto(memberCode, photoUrl) {
     
     const buffer = await response.buffer();
     const filename = safePhotoFilename(memberCode);
-    const filepath = path.join(photosDir, filename);
+    const filepath = `${photosDir}${path.sep}${filename}`;
     
     fs.writeFileSync(filepath, buffer);
     console.log(`   ✅ Downloaded: ${filename} (${buffer.length} bytes)`);

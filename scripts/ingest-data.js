@@ -63,7 +63,7 @@ class OireachtasIngester {
       }
       
       const filename = safePhotoFilename(memberCode);
-      const filepath = path.join(this.photoDir, filename);
+      const filepath = `${this.photoDir}${path.sep}${filename}`;
       
       await writeFile(filepath, photoBuffer);
       

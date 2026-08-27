@@ -8,16 +8,18 @@
 const fs = require('fs');
 const path = require('path');
 
-function resolveInside(parentDir, childName) {
-  const resolvedParent = path.resolve(parentDir);
-  const resolvedChild = path.resolve(resolvedParent, childName);
-  const parentWithSeparator = resolvedParent.endsWith(path.sep) ? resolvedParent : resolvedParent + path.sep;
-
-  if (resolvedChild !== resolvedParent && !resolvedChild.startsWith(parentWithSeparator)) {
-    throw new Error(`Refusing to access path outside ${resolvedParent}: ${childName}`);
+function safeDirectoryEntryName(entryName) {
+  if (entryName !== path.basename(entryName) || entryName === '.' || entryName === '..') {
+    throw new Error(`Refusing unsafe directory entry: ${entryName}`);
   }
 
-  return resolvedChild;
+  return entryName;
+}
+
+function childPath(parentDir, childName) {
+  const safeName = safeDirectoryEntryName(childName);
+  const separator = parentDir.endsWith(path.sep) ? '' : path.sep;
+  return `${parentDir}${separator}${safeName}`;
 }
 
 // Define the fixes to apply
@@ -113,7 +115,7 @@ function findTsxFiles(dir) {
   const files = fs.readdirSync(dir);
   
   files.forEach(file => {
-    const filePath = resolveInside(dir, file);
+    const filePath = childPath(dir, file);
     const stat = fs.statSync(filePath);
     
     if (stat.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
