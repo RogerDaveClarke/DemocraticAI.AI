@@ -6,6 +6,14 @@ const path = require('path');
 // Initialize Firestore
 const db = new Firestore();
 
+function safePhotoFilename(memberCode) {
+  const filename = `${memberCode}.jpg`;
+  if (!/^[A-Za-z0-9._-]+\.jpg$/.test(filename)) {
+    throw new Error(`Invalid member photo filename: ${filename}`);
+  }
+  return filename;
+}
+
 // Create photos directory if it doesn't exist
 const photosDir = path.join(__dirname, 'member-photos');
 if (!fs.existsSync(photosDir)) {
@@ -25,7 +33,7 @@ async function downloadMemberPhoto(memberCode, photoUrl) {
     }
     
     const buffer = await response.buffer();
-    const filename = `${memberCode}.jpg`;
+    const filename = safePhotoFilename(memberCode);
     const filepath = path.join(photosDir, filename);
     
     fs.writeFileSync(filepath, buffer);

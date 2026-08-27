@@ -12,6 +12,14 @@ const { promisify } = require('util');
 const writeFile = promisify(fs.writeFile);
 const mkdir = promisify(fs.mkdir);
 
+function safePhotoFilename(memberCode) {
+  const filename = `${memberCode}.jpg`;
+  if (!/^[A-Za-z0-9._-]+\.jpg$/.test(filename)) {
+    throw new Error(`Invalid member photo filename: ${filename}`);
+  }
+  return filename;
+}
+
 // Initialize Firestore
 const firestore = new Firestore({
   projectId: 'replace-with-your-project-id'
@@ -54,7 +62,7 @@ class OireachtasIngester {
         return null;
       }
       
-      const filename = `${memberCode}.jpg`;
+      const filename = safePhotoFilename(memberCode);
       const filepath = path.join(this.photoDir, filename);
       
       await writeFile(filepath, photoBuffer);
