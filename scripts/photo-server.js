@@ -5,8 +5,21 @@ const path = require('path');
 const app = express();
 const port = 3001;
 
-// Enable CORS for all origins
-app.use(cors());
+const allowedOrigins = (process.env.PHOTO_SERVER_ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origin not allowed by CORS'));
+  },
+}));
 
 // Serve static files from member-photos directory
 app.use('/photos/members', express.static(path.join(__dirname, 'member-photos')));
