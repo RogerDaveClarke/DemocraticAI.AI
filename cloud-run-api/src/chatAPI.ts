@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Backend API Integration for Chat with Metrics
  * Implements the server-side chat endpoints with model routing and metrics collection
  */
@@ -28,7 +28,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
     (req as any).uid = decoded.uid;
     (req as any).isAdmin = isAdmin;
     next();
-  } catch { res.status(401).json({ error: 'Invalid token' }); }
+  } catch (error) { console.warn('[chat] Firebase token rejected:', error instanceof Error ? error.message : 'unknown error'); res.status(401).json({ error: 'Invalid token' }); }
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {

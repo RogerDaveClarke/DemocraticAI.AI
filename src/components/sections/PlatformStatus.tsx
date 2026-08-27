@@ -12,6 +12,7 @@ import {
   Shield,
   Sparkles,
   TrendingUp,
+  type LucideIcon,
 } from 'lucide-react';
 import { PageShell } from '@/components/patterns';
 
@@ -19,7 +20,7 @@ type StatCard = {
   title: string;
   value: string;
   sub: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   tone: string;
 };
 

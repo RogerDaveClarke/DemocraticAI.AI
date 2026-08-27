@@ -1,21 +1,16 @@
 import {
   ArrowRight,
-  BookOpen,
   Brain,
   Building2,
   CheckCircle2,
   Cloud,
   Database,
-  Globe,
-  HelpCircle,
   Info,
-  Mail,
   MessageSquare,
   Search,
   Shield,
   ShieldCheck,
   Star,
-  UserRoundCheck,
   Workflow,
 } from 'lucide-react';
 

@@ -9,7 +9,7 @@ import {
   SecurityEventDetails,
   SECURITY_EVENT_DESCRIPTIONS,
   EVENT_SEVERITY_MAP
-} from '../types/security.js';
+} from '../types/security';
 
 interface RequestContext {
   ip?: string;
@@ -211,7 +211,7 @@ class SecurityLogger {
   
   private async handleCriticalEvent(event: SecurityEvent): Promise<void> {
     // Send immediate alert for critical events
-    console.error(`🚨 [CRITICAL-SECURITY-ALERT] ${event.eventType}`, {
+    console.error(`[CRITICAL-SECURITY-ALERT] ${event.eventType}`, {
       description: SECURITY_EVENT_DESCRIPTIONS[event.eventType],
       severity: event.severity,
       ip: event.ipAddress,

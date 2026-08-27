@@ -1,16 +1,13 @@
 import { useMemo, useState } from 'react';
 import {
   type LegacyColumnDef as ColumnDef,
-  type ColumnFiltersState,
-  type PaginationState,
-  type SortingState,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useLegacyTable,
 } from '@tanstack/react-table/legacy';
-import { flexRender } from '@tanstack/react-table';
+import { flexRender, type ColumnFiltersState, type PaginationState, type SortingState } from '@tanstack/react-table';
 import { ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -18,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
+interface DataTableProps<TData extends Record<string, any>> {
+  columns: ColumnDef<TData, unknown>[];
   data: TData[];
   filterColumn?: string;
   filterPlaceholder?: string;
@@ -28,7 +25,7 @@ interface DataTableProps<TData, TValue> {
   pageSizeOptions?: number[];
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends Record<string, any>>({
   columns,
   data,
   filterColumn,
@@ -36,7 +33,7 @@ export function DataTable<TData, TValue>({
   className,
   initialPageSize = 10,
   pageSizeOptions = [10, 20, 50],
-}: DataTableProps<TData, TValue>) {
+}: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: initialPageSize });

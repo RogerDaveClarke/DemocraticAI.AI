@@ -1,23 +1,18 @@
 import {
   ArrowRight,
-  BookOpen,
   Brain,
   Building2,
   CheckCircle2,
   Eye,
-  Globe,
-  HelpCircle,
   Info,
   Link,
   Lock,
-  Mail,
-  NotebookText,
+  Mail,  NotebookText,
   Search,
   Shield,
   ShieldCheck,
   FileCheck2,
   Scale,
-  UserRoundCheck,
 } from 'lucide-react';
 
 import { PageShell } from '@/components/patterns/PageShell';

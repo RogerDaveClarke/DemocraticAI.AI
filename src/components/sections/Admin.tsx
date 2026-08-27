@@ -4,6 +4,7 @@ import {
   Users, Inbox, BarChart2, Settings2, CheckCircle2,
   XCircle, UserPlus, Trash2, ShieldOff, ShieldCheck,
   LogOut, RefreshCw, ChevronDown, ChevronUp,
+  type LucideIcon,
 } from 'lucide-react';
 import { API_URL } from '@/config/runtime';
 
@@ -54,7 +55,7 @@ function Badge({ label, color }: { label: string; color: 'teal'|'amber'|'red'|'s
   return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>{label}</span>;
 }
 
-function TabBar({ tabs, active, onChange }: { tabs: { id: string; label: string; icon: React.ElementType; badge?: number }[]; active: string; onChange: (id: string) => void }) {
+function TabBar({ tabs, active, onChange }: { tabs: { id: string; label: string; icon: LucideIcon; badge?: number }[]; active: string; onChange: (id: string) => void }) {
   return (
     <div className="flex gap-1 border-b border-slate-200 mb-6">
       {tabs.map(t => {
@@ -78,7 +79,7 @@ function RequestsTab() {
   const [rows, setRows] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPast, setShowPast] = useState(false);
-  const [approveResult, setApproveResult] = useState(null);
+  const [approveResult, setApproveResult] = useState<{ email: string; signInLink: string | null; emailSent?: boolean; emailError?: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
@@ -134,8 +135,8 @@ function RequestsTab() {
           </div>
           <p className="text-xs text-teal-700 mb-2">{approveResult.email} — {approveResult.emailSent ? 'Email sent automatically.' : (approveResult.emailError ? 'Email failed: ' + approveResult.emailError : 'Email could not be sent — share this link manually.')}</p>
           <div className="flex gap-2 items-center">
-            <input readOnly value={approveResult.signInLink} className="flex-1 text-xs border border-teal-200 rounded-lg px-3 py-1.5 bg-white font-mono text-slate-600 truncate" />
-            <button type="button" onClick={() => { navigator.clipboard.writeText(approveResult.signInLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            <input readOnly value={approveResult.signInLink ?? ''} className="flex-1 text-xs border border-teal-200 rounded-lg px-3 py-1.5 bg-white font-mono text-slate-600 truncate" />
+            <button type="button" onClick={() => { if (approveResult.signInLink) navigator.clipboard.writeText(approveResult.signInLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
               className="px-3 py-1.5 bg-teal-500 text-white text-xs font-semibold rounded-lg">
               {copied ? 'Copied!' : 'Copy'}
             </button>

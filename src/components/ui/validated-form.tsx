@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type DefaultValues, type UseFormReturn } from 'react-hook-form';
+import { useForm, type DefaultValues, type FieldValues, type Resolver, type UseFormReturn } from 'react-hook-form';
 import { type z } from 'zod';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 
-interface ValidatedFormProps<TSchema extends z.ZodTypeAny> {
+interface ValidatedFormProps<TSchema extends z.ZodType<FieldValues>> {
   schema: TSchema;
   defaultValues: DefaultValues<z.infer<TSchema>>;
   onSubmit: (values: z.infer<TSchema>, form: UseFormReturn<z.infer<TSchema>>) => void | Promise<void>;
@@ -16,7 +16,7 @@ interface ValidatedFormProps<TSchema extends z.ZodTypeAny> {
   className?: string;
 }
 
-export function ValidatedForm<TSchema extends z.ZodTypeAny>({
+export function ValidatedForm<TSchema extends z.ZodType<FieldValues>>({
   schema,
   defaultValues,
   onSubmit,
@@ -25,7 +25,7 @@ export function ValidatedForm<TSchema extends z.ZodTypeAny>({
   className,
 }: ValidatedFormProps<TSchema>) {
   const form = useForm<z.infer<TSchema>>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema as z.ZodType<FieldValues, FieldValues>) as unknown as Resolver<z.infer<TSchema>>,
     defaultValues,
     mode: 'onSubmit',
   });

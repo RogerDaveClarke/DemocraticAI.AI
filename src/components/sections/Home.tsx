@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  Building2,
   BookOpen,
   CheckCircle2,
   ClipboardList,
@@ -15,6 +14,7 @@ import {
   ShieldCheck,
   Target,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { PageShell } from '@/components/patterns/PageShell';
@@ -22,13 +22,13 @@ import { PageShell } from '@/components/patterns/PageShell';
 type TrustChip = {
   title: string;
   sub: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   tone: string;
 };
 
 type ResearchGoal = {
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   color: string;
 };
 
@@ -36,7 +36,7 @@ type PrincipleCard = {
   title: string;
   text: string;
   cta: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   tone: string;
 };
 

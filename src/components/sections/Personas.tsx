@@ -1,6 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
 import { track } from '@/utils/analytics';
-import { track } from '@/utils/analytics';
 import {
   CalendarDays,
   Eye,
@@ -171,7 +170,6 @@ export default function Personas() {
           <SearchToolbar
             value={searchTerm}
             onChange={setSearchTerm}
-            onBlur={(v) => { if(v.trim()) track('personas','search','submit',v.trim()); }}
             onBlur={(v) => { if(v.trim()) track('personas','search','submit',v.trim()); }}
             placeholder="Search ministers, positions, or keywords..."
             rightSlot={(

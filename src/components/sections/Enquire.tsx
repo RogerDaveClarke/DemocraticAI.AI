@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { track } from '@/utils/analytics';
-import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, BadgeCheck, SearchCheck, ChevronRight, CheckCircle2, MessageSquare, Search } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PromptLibrary from '../PromptLibrary';
 import { useLoadingAnnouncer } from '../../hooks/accessibilityHooks';
@@ -133,12 +133,6 @@ export default function Enquire() {
     'Explain this bill in plain language and identify the most impacted groups.',
     'Compare amendments across versions of this legislation.',
     'What themes dominate discussions on housing?',
-  ];
-
-  const trustIndicators = [
-    { label: 'Source Grounded', icon: ShieldCheck },
-    { label: 'Explainable', icon: SearchCheck },
-    { label: 'Verifiable', icon: BadgeCheck },
   ];
 
   const researchGoals = [

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getMultiFactorResolver,
   isSignInWithEmailLink,
@@ -22,7 +22,7 @@ export default function SignInPage({ redirectError }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
-  const [completingLink, setCompletingLink] = useState(() => isSignInWithEmailLink(auth, window.location.href));
+  const [completingLink] = useState(() => isSignInWithEmailLink(auth, window.location.href));
   const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
   const [mfaOtp, setMfaOtp] = useState('');
   const [mfaError, setMfaError] = useState('');

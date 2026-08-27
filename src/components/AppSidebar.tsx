@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   BadgeInfo,
   BookOpen,
@@ -16,20 +16,22 @@
   Target,
   Users,
   Settings2,
+  type LucideIcon,
 } from 'lucide-react';
-import type { ElementType } from 'react';
 
 interface AppSidebarProps {
   currentSection: string;
   onBackToHome: () => void;
   onSectionChange: (section: string) => void;
+  isAdmin?: boolean;
 }
 
 type NavItem = {
   id: string;
   label: string;
-  icon: ElementType;
+  icon: LucideIcon;
   description?: string;
+  adminOnly?: boolean;
 };
 
 type NavGroup = {

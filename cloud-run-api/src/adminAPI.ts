@@ -3,7 +3,7 @@ import { Firestore } from '@google-cloud/firestore';
 import { initializeApp as adminInitApp, getApps as adminGetApps } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getRemoteConfig } from 'firebase-admin/remote-config';
-import { generatePasswordlessLink, sendPasswordlessEmail } from './passwordlessAuthAPI.js';
+import { generatePasswordlessLink, sendPasswordlessEmail } from './passwordlessAuthAPI';
 // Uses native fetch (Node 18+) -- no SDK dependency required
 async function resendEmail(to: string, subject: string, html: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;

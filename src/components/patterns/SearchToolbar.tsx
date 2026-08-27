@@ -1,4 +1,4 @@
-﻿import { type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -9,6 +9,7 @@ interface SearchToolbarProps {
   placeholder: string;
   rightSlot?: ReactNode;
   className?: string;
+  onBlur?: (value: string) => void;
 }
 
 export function SearchToolbar({ value, onChange, placeholder, rightSlot, className, onBlur }: SearchToolbarProps) {

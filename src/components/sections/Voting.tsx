@@ -1,4 +1,5 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { track } from '@/utils/analytics';
 import {
   AlertTriangle,
   ArrowRight,
@@ -482,7 +483,7 @@ export default function Voting() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--dai-slate)]" />
                 <input
                   value={searchQuery}
-                  onKeyDown={(event) => { if(event.key==='Enter') track('voting','search','submit',event.currentTarget.value); }} onKeyDown={(event) => { if(event.key==='Enter') track('voting','search','submit',event.currentTarget.value); }} onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => { if(event.key==='Enter') track('voting','search','submit',event.currentTarget.value); }} onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Bill, member, government"
                   className="h-9 w-full rounded-lg border border-[var(--dai-border)] bg-white pl-9 pr-3 text-xs text-[var(--dai-slate)] outline-none ring-cyan-200 transition focus:ring"
                 />

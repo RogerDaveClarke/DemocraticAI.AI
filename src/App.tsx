@@ -202,33 +202,6 @@ function App() {
     return titles[section];
   };
 
-  const getSectionDescription = (section: Section): string => {
-    const descriptions: Record<Section, string> = {
-      home: 'AI-powered insights and research pathways for parliamentary transparency',
-      research: 'Ask questions about the Irish Parliament with the Parliamentary AI Assistant',
-      'research-library': 'Curated prompts to help you explore, analyze, and understand parliamentary data',
-      'saved-research': 'Access and manage your saved research, prompts and reports',
-      'ai-integrity': 'Detect likely AI-assisted drafting in debates and legislation',
-      'responsible-ai': 'Understand the platform safety controls, transparency standards, and governance commitments',
-      'platform-status': 'Transparency, data sources, and system health',
-      about: 'Mission, methodology, and governance approach behind Parliament AI',
-      architecture: 'Understand the end-to-end architecture for transparent and accountable parliamentary AI responses',
-      'virtual-dail': 'Experience interactive parliamentary debates in a simulated chamber environment',
-      officials: 'View and filter elected representatives',
-      personas: 'Explore comprehensive ministerial profiles and data cards',
-      debates: 'Explore recent parliamentary discussions and proceedings',
-      voting: 'Analyze voting patterns and bill outcomes',
-      qa: 'Review parliamentary questions and official responses',
-      'advanced-ai-analytics': 'Analyze framing, rhetoric, and unparliamentary language patterns',
-      'bias-detection': 'Identify linguistic bias and framing effects in parliamentary discourse',
-      attendance: 'Track session participation and attendance records',
-      statistics: 'Explore bills, acts, stages, and activity across the parliamentary journey',
-      analytics: 'Trends and insights from research activity and AI usage',
-      admin: 'Manage users, access requests, features, and usage',
-      fun: 'Interactive games, simulations, and engaging parliamentary experiences',
-    };
-    return descriptions[section];
-  };
 
   const renderSection = () => {
     const LoadingSpinner = () => (
@@ -292,7 +265,7 @@ function App() {
 
       <div className="ml-[285px] pt-16">
 
-        <main id="main-content" className={currentSection === 'research' ? 'h-screen' : currentSection === 'home' || currentSection === 'fun' || currentSection === 'responsible-ai' || currentSection === 'platform-status' || currentSection === 'about' || currentSection === 'architecture' || currentSection === 'research-library' || currentSection === 'saved-research' || currentSection === 'analytics' || currentSection === 'about' ? '' : 'p-8'} role="main">
+        <main id="main-content" className={currentSection === 'research' ? 'h-screen' : currentSection === 'home' || currentSection === 'fun' || currentSection === 'responsible-ai' || currentSection === 'platform-status' || currentSection === 'about' || currentSection === 'architecture' || currentSection === 'research-library' || currentSection === 'saved-research' || currentSection === 'analytics' ? '' : 'p-8'} role="main">
           {renderSection()}
         </main>
 

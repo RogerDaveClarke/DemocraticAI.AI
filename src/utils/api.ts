@@ -1,4 +1,5 @@
 import { API_URL } from '@/config/runtime';
+import { auth } from '@/config/firebase';
 /**
  * API Utility for secure API communications
  * Handles authentication, headers, and error handling
@@ -18,6 +19,9 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
   
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
+
+  const token = await auth.currentUser?.getIdToken(true);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
   
   // Add API key for chat endpoints and monitoring endpoints in production
   if ((endpoint.startsWith('/api/chat') || endpoint.startsWith('/api/usage-stats') || endpoint.startsWith('/api/security-events')) && API_KEY) {
@@ -40,7 +44,7 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
     
     // Handle authentication errors
     if (response.status === 401) {
-      throw new Error('Authentication failed. Please check your API key.');
+      throw new Error('Authentication failed. Please sign in again.');
     }
     
     // Handle other HTTP errors

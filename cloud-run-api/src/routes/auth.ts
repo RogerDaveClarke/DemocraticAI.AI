@@ -12,7 +12,7 @@ import axios from 'axios';
 import { Firestore } from '@google-cloud/firestore';
 import { OAuth2Client } from 'google-auth-library';
 // import { ConfidentialClientApplication } from '@azure/msal-node';
-import SecurityLogger from '../utils/SecurityLogger.js';
+import SecurityLogger from '../utils/SecurityLogger';
 import {
   User,
   UserDocument,
@@ -24,7 +24,7 @@ import {
   GoogleProfile,
   MicrosoftOAuthCredentials,
   MicrosoftProfile
-} from '../types/auth.js';
+} from '../types/auth';
 
 const router = express.Router();
 const db = new Firestore();
@@ -62,7 +62,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 //   }
 // });
 
-// Rate limiting middleware — 10 auth attempts per IP per 15 minutes
+// Rate limiting middleware - 10 auth attempts per IP per 15 minutes
 const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,

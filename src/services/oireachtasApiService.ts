@@ -1,5 +1,43 @@
-import type { Minister } from '../components/sections/Personas';
 import { API_URL } from '@/config/runtime';
+
+interface Minister {
+  id: string;
+  name: string;
+  party: string;
+  position: string;
+  constituency: string;
+  imageUrl: string;
+  stats: {
+    policyDomains: string[];
+    communicationStyle: 'Diplomatic' | 'Charismatic' | 'Passionate' | 'Direct' | 'Technical';
+    votingConsistency: number;
+    popularityRating: number;
+    mediaPresence: number;
+    controversyLevel: number;
+    yearsInOffice: number;
+    billsSponsored: number;
+  };
+  keywords: string[];
+  networkAnalysis: {
+    allyCount: number;
+    influenceScore: number;
+    crossPartyConnections: number;
+  };
+  recentQuotes: string[];
+  achievements: string[];
+  biasAnalysis: {
+    politicalBias: string;
+    economicPosition: string;
+    socialIssues: string;
+    identifiedBiases: string[];
+  };
+  emotionalProfile: {
+    primaryEmotion: string;
+    stressResponse: string;
+    empathyLevel: number;
+    temperament: string;
+  };
+}
 
 // API Configuration
 const PHOTO_API_BASE = `${API_URL}/api`;
