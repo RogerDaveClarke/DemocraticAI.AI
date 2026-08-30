@@ -168,6 +168,7 @@ class SecurityLogger {
   
   private logToConsole(event: SecurityEvent): void {
     const description = SECURITY_EVENT_DESCRIPTIONS[event.eventType];
+    const sanitizedDetails = this.sanitizeDetails(event.details);
     
     // Create structured log entry for Cloud Logging
     const structuredLog = {
@@ -182,7 +183,7 @@ class SecurityLogger {
       method: event.method,
       blocked: event.blocked,
       description,
-      details: event.details,
+      details: sanitizedDetails,
       requestId: event.requestId
     };
     
@@ -211,15 +212,40 @@ class SecurityLogger {
   
   private async handleCriticalEvent(event: SecurityEvent): Promise<void> {
     // Send immediate alert for critical events
-    console.error(`[CRITICAL-SECURITY-ALERT] ${event.eventType}`, {
+    console.error('[CRITICAL-SECURITY-ALERT]', event.eventType, {
       description: SECURITY_EVENT_DESCRIPTIONS[event.eventType],
       severity: event.severity,
       ip: event.ipAddress,
       endpoint: event.endpoint,
       timestamp: event.timestamp,
       blocked: event.blocked,
-      details: event.details
+      details: this.sanitizeDetails(event.details)
     });
+  }
+
+  private sanitizeDetails(details: SecurityEventDetails): SecurityEventDetails {
+    const sensitiveFieldPattern = /(api[-_]?key|token|secret|password|authorization|cookie)/i;
+    const sanitizeValue = (key: string, value: unknown): unknown => {
+      if (sensitiveFieldPattern.test(key)) {
+        return '[REDACTED]';
+      }
+
+      if (Array.isArray(value)) {
+        return value.map(item => sanitizeValue('', item));
+      }
+
+      if (value && typeof value === 'object') {
+        const sanitizedObject: Record<string, unknown> = {};
+        for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+          sanitizedObject[nestedKey] = sanitizeValue(nestedKey, nestedValue);
+        }
+        return sanitizedObject;
+      }
+
+      return value;
+    };
+
+    return sanitizeValue('', details || {}) as SecurityEventDetails;
   }
   
   private generateRequestId(): string {
