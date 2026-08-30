@@ -142,7 +142,7 @@ async function uploadPartyImages() {
         console.log(`  ✅ Updated Firestore with image URL`);
         
       } catch (error) {
-        console.log(`  ❌ Failed to process ${imageFile}:`, error.message);
+        console.log('  ❌ Failed to process image', imageFile, error.message);
       }
       
       console.log('');

@@ -29,7 +29,7 @@ class FrontendSecurityLogger {
   ): Promise<void> {
     try {
       // Log to console for development
-      console.warn(`[SECURITY-EVENT] ${eventType}`, {
+      console.warn('[SECURITY-EVENT]', eventType, {
         endpoint,
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),

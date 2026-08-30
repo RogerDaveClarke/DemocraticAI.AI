@@ -343,7 +343,7 @@ const neutralizeLogValue = (value: unknown): string => {
 };
 
 const logError = (message: string, error: any) => {
-  console.error(`[ERROR] ${neutralizeLogValue(message)}:`, error);
+  console.error('[ERROR]', neutralizeLogValue(message), error);
 };
 
 const logInfo = (message: string) => {

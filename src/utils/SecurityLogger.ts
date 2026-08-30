@@ -386,7 +386,7 @@ class SecurityLogger {
   
   private async sendSecurityAlert(event: SecurityEvent): Promise<void> {
     // Implement your alerting logic here (email, Slack, webhook, etc.)
-    console.error(`🚨 [CRITICAL-SECURITY-ALERT] ${event.eventType}`, {
+    console.error('🚨 [CRITICAL-SECURITY-ALERT]', event.eventType, {
       description: SECURITY_EVENT_DESCRIPTIONS[event.eventType],
       severity: event.severity,
       ip: event.ipAddress,
