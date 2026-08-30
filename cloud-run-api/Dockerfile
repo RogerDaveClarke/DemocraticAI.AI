@@ -2,7 +2,7 @@
 # Multi-stage build for TypeScript compilation and production deployment
 
 # Build stage
-FROM node:18-slim AS builder
+FROM node:26.7.0-slim AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Production stage
-FROM node:18-slim
+FROM node:26.7.0-slim
 
 # Install security updates and required packages
 RUN apt-get update && apt-get upgrade -y && \
