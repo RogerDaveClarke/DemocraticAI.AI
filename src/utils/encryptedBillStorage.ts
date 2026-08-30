@@ -378,7 +378,7 @@ export async function listBillsSecurely(): Promise<SavedBill[]> {
           });
         }
       } catch (error) {
-        console.error(`Failed to load bill ${billId}:`, error);
+        console.error('Failed to load bill', billId, error);
       }
     }
     

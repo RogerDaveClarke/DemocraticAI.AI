@@ -104,7 +104,7 @@ router.get('/trending-topics/:id', async (req: Request, res: Response) => {
     
     return res.json(topicDetail);
   } catch (error) {
-    console.error(`Error fetching topic ${neutralizeLogValue(req.params.id)}:`, error);
+    console.error('Error fetching topic', neutralizeLogValue(req.params.id), error);
     return res.status(500).json({ error: 'Failed to fetch topic details' });
   }
 });

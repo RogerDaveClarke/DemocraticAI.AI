@@ -134,7 +134,7 @@ class MemberRelationshipUpdater {
           }
           
         } catch (error) {
-          console.error(`❌ Error processing ${data.fullName}:`, error.message);
+          console.error('❌ Error processing member', data.fullName, error.message);
           errors++;
         }
       }

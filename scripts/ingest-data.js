@@ -73,7 +73,7 @@ class OireachtasIngester {
       return photoUrl;
       
     } catch (error) {
-      console.error(`Error downloading photo for ${fullName}:`, error.message);
+      console.error('Error downloading photo for', fullName, error.message);
       return null;
     }
   }
@@ -99,7 +99,7 @@ class OireachtasIngester {
         
         return data;
       } catch (error) {
-        console.error(`Attempt ${i + 1} failed:`, error.message);
+        console.error('Attempt', i + 1, 'failed:', error.message);
         if (i === maxRetries - 1) throw error;
         await this.delay(2000); // Wait 2 seconds before retry
       }
@@ -145,7 +145,7 @@ class OireachtasIngester {
         skip += limit;
         
       } catch (error) {
-        console.error(`Error fetching ${endpoint}:`, error.message);
+        console.error('Error fetching endpoint', endpoint, error.message);
         break;
       }
     }
@@ -201,7 +201,7 @@ class OireachtasIngester {
         }
         
         if (!docId) {
-          console.warn(`Missing document ID for item in ${collectionName}:`, item);
+          console.warn('Missing document ID for item in collection', collectionName, item);
           continue;
         }
 
@@ -229,7 +229,7 @@ class OireachtasIngester {
           batchCount = 0;
         }
       } catch (error) {
-        console.error(`Error processing item for ${collectionName}:`, error.message);
+        console.error('Error processing item for collection', collectionName, error.message);
       }
     }
 
