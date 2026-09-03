@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { track } from '@/utils/analytics';
-import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PromptLibrary from '../PromptLibrary';
 import { useLoadingAnnouncer } from '../../hooks/accessibilityHooks';
@@ -17,6 +17,7 @@ interface Message {
   timestamp: Date;
   executionId?: string;
   feedbackGiven?: boolean;
+  sources?: SearchDocument[];
   metadata?: {
     modelUsed: string;
     cost: number;
@@ -25,6 +26,7 @@ interface Message {
     tokensUsed: number;
     retrievedDocuments: number;
     analysisMode?: string;
+    deepResearch?: boolean;
   };
 }
 
@@ -52,6 +54,16 @@ interface PromptExecution {
   feedbackText?: string;
 }
 
+interface SearchDocument {
+  id: string;
+  title: string;
+  content: string;
+  source: 'bill' | 'debate' | 'question';
+  date?: string;
+  uri?: string;
+  relevance?: number;
+}
+
 
 
 const FEEDBACK_ENABLED = import.meta.env.VITE_FEEDBACK_ENABLED === 'true';
@@ -75,9 +87,15 @@ export default function Enquire() {
   const [executionsMap, setExecutionsMap] = useState<Map<string, PromptExecution>>(new Map());
   const [selectedResearchGoal, setSelectedResearchGoal] = useState('');
   const [recentResearch, setRecentResearch] = useState<string[]>([]);
+  const [sourceDialog, setSourceDialog] = useState<{ sources: SearchDocument[]; responseId: string } | null>(null);
+  const [chatPanelWidth, setChatPanelWidth] = useState(70);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1280px)').matches);
+  const [deepResearch, setDeepResearch] = useState(false);
+  const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, cost: 0, requests: 0, lastTokens: 0, lastCost: 0 });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(generateSessionId());
   
   // Accessibility hooks
@@ -182,23 +200,28 @@ export default function Enquire() {
   const defaultSystemPrompt = 'You are the Parliamentary AI Assistant for the Irish Parliament. Answer clearly and factually using the provided parliamentary context. Prioritize evidence, cite sources when possible, and be concise but complete.';
 
   const responseStructureInstruction = [
-    'Return the answer with these exact markdown headings in order:',
-    '## Summary',
-    '## Evidence',
-    '## Sources',
-    '## Related Debates',
-    '## Confidence',
-    '## Engineering Notes',
-    'Under Sources, include concrete citations where possible.',
+    'Return the answer with these exact bold Markdown section labels in order:',
+    '**Summary**',
+    '**Evidence**',
+    '**Sources**',
+    '**Related Debates**',
+    '**Confidence**',
+    '**Engineering Notes**',
+    'Put each section label on its own line, with a blank line before and after it. Use short paragraphs separated by blank lines and Markdown bullet lists where they improve scanning.',
+    'Within Evidence, use bold descriptive subsections such as **Government position:** and **Opposition criticism:** when relevant. Do not use Markdown heading syntax (# or ##).',
+    'Only make claims supported by the supplied context. Under Sources, cite records using their titles; do not invent URLs.',
   ].join('\n');
 
-  const buildSystemPrompt = (promptId?: string): string => {
+  const buildSystemPrompt = (promptId?: string, isDeepResearch = false): string => {
+    const deepResearchInstruction = isDeepResearch
+      ? '\n\nDeep research mode: compare evidence across the supplied records, identify changes over time, and distinguish direct evidence from interpretation.'
+      : '';
     if (!promptId) {
-      return `${defaultSystemPrompt}\n\n${responseStructureInstruction}`;
+      return `${defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}`;
     }
 
     const selectedPrompt = promptLibrary.find(prompt => prompt.id === promptId);
-    return `${selectedPrompt?.systemPrompt || defaultSystemPrompt}\n\n${responseStructureInstruction}`;
+    return `${selectedPrompt?.systemPrompt || defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}`;
   };
 
   const getConfidenceLabel = (confidence: number): 'High' | 'Medium' | 'Low' => {
@@ -206,16 +229,6 @@ export default function Enquire() {
     if (confidence >= 0.6) return 'Medium';
     return 'Low';
   };
-
-  const extractSourceCount = (text: string, fallbackCount: number): number => {
-    const markdownLinks = text.match(/\[[^\]]+\]\((https?:\/\/|\/)[^)]+\)/g) || [];
-    if (markdownLinks.length > 0) return markdownLinks.length;
-
-    const sourceMentions = text.match(/hansard|debate|committee|bill|source|citation/gi) || [];
-    return Math.max(fallbackCount, Math.min(sourceMentions.length, 12));
-  };
-
-
 
   function generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -250,6 +263,13 @@ export default function Enquire() {
     } catch (error) {
       console.error('Failed to load recent research queries:', error);
     }
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    const updateLayout = () => setIsDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener('change', updateLayout);
+    return () => mediaQuery.removeEventListener('change', updateLayout);
   }, []);
 
   const updateRecentResearch = (query: string) => {
@@ -322,27 +342,32 @@ export default function Enquire() {
     }
   }, []);
 
-  const routeToOptimalModel = (query: string, context: any[]): 'gemini-flash' | 'gpt-4o-mini' | 'gemini-pro' => {
+  const routeToOptimalModel = (query: string, context: any[]): 'gemini-flash' | 'gemini-pro' => {
     const complexity = query.length > 200 ? 0.8 : query.length > 100 ? 0.6 : 0.4;
     const contextSize = context.length;
     const hasComplexReasoning = /why|how|analyze|compare|explain|complex/i.test(query);
     
     if (hasComplexReasoning && complexity > 0.7) {
       return 'gemini-pro';
-    } else if (complexity > 0.5 || contextSize > 10) {
-      return 'gpt-4o-mini';
-    } else {
-      return 'gemini-flash';
     }
+
+    // GPT-4o-mini is not configured in the production API; Gemini Flash serves standard retrieval queries.
+    void contextSize;
+    return 'gemini-flash';
   };
 
   const executeQuery = async (
     query: string,
-    promptId?: string
+    promptId?: string,
+    isDeepResearch = false
   ): Promise<{ response: Message; execution: PromptExecution }> => {
     const startTime = Date.now();
-    const context: any[] = []; // In production, retrieve relevant documents
-    const selectedModel = routeToOptimalModel(query, context);
+    const searchResponse = await apiPost<{ documents?: SearchDocument[] }>('/api/search', {
+      query,
+      limit: isDeepResearch ? 50 : 20,
+    });
+    const context = searchResponse.documents || [];
+    const selectedModel = isDeepResearch ? 'gemini-pro' : routeToOptimalModel(query, context);
     
     const execution: PromptExecution = {
       id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -378,7 +403,7 @@ export default function Enquire() {
         context,
         model: selectedModel,
         userLanguage,
-        prompt: buildSystemPrompt(promptId),
+        prompt: buildSystemPrompt(promptId, isDeepResearch),
         sessionId: sessionId.current,
         promptId
       });
@@ -398,6 +423,7 @@ export default function Enquire() {
         sender: 'bot',
         timestamp: new Date(),
         executionId: apiResponse.executionId || execution.id,
+        sources: context,
         metadata: {
           modelUsed: selectedModel,
           cost: apiResponse.cost,
@@ -405,10 +431,19 @@ export default function Enquire() {
           confidence: apiResponse.confidence,
           tokensUsed: apiResponse.tokensInput + apiResponse.tokensOutput,
           retrievedDocuments: context.length,
-          analysisMode: apiResponse.analysisMode
+          analysisMode: apiResponse.analysisMode,
+          deepResearch: isDeepResearch
         }
       };
 
+      setUsage((currentUsage) => ({
+        inputTokens: currentUsage.inputTokens + apiResponse.tokensInput,
+        outputTokens: currentUsage.outputTokens + apiResponse.tokensOutput,
+        cost: currentUsage.cost + apiResponse.cost,
+        requests: currentUsage.requests + 1,
+        lastTokens: apiResponse.tokensInput + apiResponse.tokensOutput,
+        lastCost: apiResponse.cost,
+      }));
       updateMetrics(execution);
       return { response, execution };
 
@@ -456,10 +491,11 @@ export default function Enquire() {
     
     setInputValue('');
     const promptToUse = selectedPromptId;
+    const deepResearchToUse = deepResearch;
     setSelectedPromptId(undefined);
 
     try {
-      const { response } = await executeQuery(userMessage.text, promptToUse);
+      const { response } = await executeQuery(userMessage.text, promptToUse, deepResearchToUse);
       setMessages(prev => [...prev, response]);
       announceComplete('Search results loaded successfully');
     } catch (error) {
@@ -467,10 +503,13 @@ export default function Enquire() {
       const selectedPrompt = promptToUse ? promptLibrary.find(p => p.id === promptToUse) : undefined;
       const modeLabel = selectedPrompt?.analysisFocus || 'General retrieval and answer mode';
       const failureMessage = error instanceof Error ? error.message : 'The selected AI model is currently unavailable. Please try again later.';
+      const isRateLimited = /rate limit|too many requests/i.test(failureMessage);
 
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Model unavailable for ${modeLabel}.\n\n${failureMessage}`,
+        text: isRateLimited
+          ? `Request limit reached.\n\n${failureMessage}`
+          : `Model unavailable for ${modeLabel}.\n\n${failureMessage}`,
         sender: 'bot',
         timestamp: new Date(),
         metadata: {
@@ -485,7 +524,7 @@ export default function Enquire() {
       };
 
       setMessages(prev => [...prev, errorResponse]);
-      announceComplete('Model unavailable. Please try again later.');
+  announceComplete(isRateLimited ? 'Request limit reached. Please try again shortly.' : 'Model unavailable. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -607,30 +646,56 @@ export default function Enquire() {
     }
   };
 
+  const resizeChatPanel = (clientX: number) => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+
+    const bounds = workspace.getBoundingClientRect();
+    const nextWidth = ((bounds.right - clientX) / bounds.width) * 100;
+    setChatPanelWidth(Math.min(78, Math.max(28, nextWidth)));
+  };
+
+  const handleResizeStart = (event: PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeChatPanel(event.clientX);
+  };
+
+  const handleResizeMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      resizeChatPanel(event.clientX);
+    }
+  };
+
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    setChatPanelWidth((currentWidth) => Math.min(78, Math.max(28, currentWidth + (event.key === 'ArrowRight' ? 2 : -2))));
+  };
+
   return (
-    <PageShell className="h-[calc(100vh-80px)] p-5">
+    <PageShell className="h-[calc(100vh-80px)] p-5" contentClassName="h-full max-w-none">
       <LoadingAnnouncementRegion />
 
-      <div className="grid h-full grid-cols-1 gap-4 xl:grid-cols-[1.95fr_1.05fr]">
-        <section className="order-2 flex min-h-0 flex-col rounded-xl border border-[var(--dai-border)] bg-white shadow-sm xl:order-2">
-          <div className="border-b border-slate-700 bg-gradient-to-r from-[var(--color-navy-950)] to-[#1b3a5c] px-5 py-4">
+      <div ref={workspaceRef} className="grid h-full grid-cols-1 gap-4 xl:gap-0" style={isDesktop ? { gridTemplateColumns: `minmax(20rem, 1fr) 12px minmax(0, ${chatPanelWidth}%)` } as CSSProperties : undefined}>
+        <section className="order-2 flex min-h-0 flex-col rounded-xl border border-[var(--dai-border)] bg-white shadow-sm xl:order-3">
+          <div className="border-b border-[var(--dai-border)] bg-white px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-teal-400/30 bg-teal-500/20">
-                  <Search size={15} className="text-teal-300" />
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50">
+                  <Search size={15} className="text-teal-700" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold leading-tight text-white">Research Assistant</h2>
-                  <p className="mt-0.5 text-xs text-slate-300">Grounded in official parliamentary records</p>
+                  <h2 className="text-base font-semibold leading-tight text-[var(--dai-ink)]">Research Assistant</h2>
+                  <p className="mt-0.5 text-xs text-[var(--dai-slate)]">Grounded in official parliamentary records</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-1 text-[10px] font-medium text-teal-300">
-                  <ShieldCheck size={11} />
+              <div className="flex items-center gap-3 text-[10px] font-medium text-[var(--dai-slate)]">
+                <span className="inline-flex items-center gap-1">
+                  <ShieldCheck size={12} className="text-teal-600" />
                   Source grounded
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-medium text-slate-300">
-                  <Lightbulb size={11} className="text-teal-400" />
+                <span className="inline-flex items-center gap-1">
+                  <Lightbulb size={12} className="text-teal-600" />
                   Verifiable
                 </span>
               </div>
@@ -671,7 +736,7 @@ export default function Enquire() {
                     className={`rounded-lg border p-3 ${message.sender === 'user' ? 'border-[#1b3a5c] bg-[var(--color-navy-950)] text-white' : 'border-slate-200 bg-slate-50 text-[var(--dai-ink)]'}`}
                   >
                     {message.sender === 'bot' ? (
-                      <div className="prose prose-sm max-w-none">
+                      <div className="prose prose-sm max-w-none prose-headings:mb-2 prose-headings:mt-5 prose-headings:text-[var(--dai-ink)] prose-p:my-3 prose-p:leading-6 prose-li:my-1">
                         <ReactMarkdown>
                           {message.text}
                         </ReactMarkdown>
@@ -681,8 +746,17 @@ export default function Enquire() {
                     )}
 
                     {message.sender === 'bot' && message.metadata && (
-                      <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-[var(--dai-slate)]">
-                        Confidence: {getConfidenceLabel(message.metadata.confidence)} ? Sources: {extractSourceCount(message.text, message.metadata.retrievedDocuments)}
+                      <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-[var(--dai-slate)]">
+                        <span>Confidence: {getConfidenceLabel(message.metadata.confidence)}</span>
+                        <span aria-hidden="true">&bull;</span>
+                        <button
+                          type="button"
+                          onClick={() => setSourceDialog({ sources: message.sources || [], responseId: message.id })}
+                          className="font-medium text-teal-700 underline decoration-teal-400 underline-offset-2 hover:text-teal-900"
+                          aria-haspopup="dialog"
+                        >
+                          Sources: {message.sources?.length ?? message.metadata.retrievedDocuments}
+                        </button>
                       </div>
                     )}
 
@@ -796,19 +870,45 @@ export default function Enquire() {
                     <Lightbulb size={12} />
                     Research Library
                   </button>
-                  <button type="button" className="inline-flex items-center gap-1 rounded-full border border-[var(--dai-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--dai-slate)]">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={deepResearch}
+                    onClick={() => setDeepResearch((enabled) => !enabled)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${deepResearch ? 'border-teal-300 bg-teal-50 text-teal-800' : 'border-[var(--dai-border)] bg-white text-[var(--dai-slate)] hover:bg-slate-50'}`}
+                  >
                     Deep Research
-                    <span className="inline-flex h-3.5 w-7 rounded-full bg-slate-200 p-0.5"><span className="h-2.5 w-2.5 rounded-full bg-white" /></span>
+                    <span className={`inline-flex h-3.5 w-7 rounded-full p-0.5 transition ${deepResearch ? 'bg-teal-600' : 'bg-slate-200'}`}><span className={`h-2.5 w-2.5 rounded-full bg-white transition ${deepResearch ? 'translate-x-3.5' : ''}`} /></span>
                   </button>
                 </div>
-                <div className="inline-flex items-center gap-1 text-xs text-[var(--dai-slate)]">
-                  <ShieldCheck size={12} className="text-emerald-600" />
-                  Responses are grounded in official parliamentary records.
+                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-[var(--dai-slate)]">
+                  <span className="inline-flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-600" />Responses are grounded in official parliamentary records.</span>
+                  <span className="font-medium text-[var(--dai-ink)]">Latest: {usage.lastTokens.toLocaleString()} tokens, ${usage.lastCost.toFixed(4)}</span>
+                  <span>Session total: {usage.requests} requests, {(usage.inputTokens + usage.outputTokens).toLocaleString()} tokens, ${usage.cost.toFixed(4)} estimated</span>
                 </div>
               </div>
             </form>
           </div>
         </section>
+
+        <div className="order-3 hidden min-h-0 items-stretch justify-center xl:order-2 xl:flex">
+          <button
+            type="button"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize chat and research tools"
+            aria-valuemin={28}
+            aria-valuemax={78}
+            aria-valuenow={Math.round(chatPanelWidth)}
+            onPointerDown={handleResizeStart}
+            onPointerMove={handleResizeMove}
+            onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+            onKeyDown={handleResizeKeyDown}
+            className="group flex w-full cursor-col-resize touch-none items-center justify-center outline-none focus-visible:bg-teal-100"
+          >
+            <span className="h-12 w-1 rounded-full bg-slate-300 transition group-hover:bg-teal-500 group-focus-visible:bg-teal-600" />
+          </button>
+        </div>
 
         <section className="order-1 min-h-0 overflow-y-auto rounded-xl border border-[var(--dai-border)] bg-white p-4 shadow-sm xl:order-1">
           <div className="mb-4 border-b border-slate-200 pb-3">
@@ -937,6 +1037,46 @@ export default function Enquire() {
           onClose={() => setShowPromptLibrary(false)}
           onSelectPrompt={(prompt: string, promptId: string) => handlePromptSelect(prompt, promptId)}
         />
+      )}
+
+      {sourceDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={() => setSourceDialog(null)}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`source-dialog-title-${sourceDialog.responseId}`}
+            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 id={`source-dialog-title-${sourceDialog.responseId}`} className="text-base font-semibold text-[var(--dai-ink)]">Sources used for this answer</h3>
+                <p className="mt-1 text-sm text-[var(--dai-slate)]">Official parliamentary records retrieved for this response.</p>
+              </div>
+              <button type="button" onClick={() => setSourceDialog(null)} aria-label="Close sources" className="rounded-md p-1 text-[var(--dai-slate)] hover:bg-slate-100 hover:text-[var(--dai-ink)]">
+                <X size={18} />
+              </button>
+            </div>
+            {sourceDialog.sources.length > 0 ? (
+              <ol className="space-y-3">
+                {sourceDialog.sources.map((source, index) => (
+                  <li key={`${source.source}-${source.id}`} className="border-b border-slate-100 pb-3 last:border-0">
+                    {source.uri ? (
+                      <a href={source.uri} target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline decoration-teal-400 underline-offset-2 hover:text-teal-900">
+                        {index + 1}. {source.title}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-[var(--dai-ink)]">{index + 1}. {source.title}</span>
+                    )}
+                    <p className="mt-1 text-xs text-[var(--dai-slate)]">{source.source} {source.date ? `| ${source.date}` : ''}</p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-[var(--dai-slate)]">No source records were returned for this response.</p>
+            )}
+          </section>
+        </div>
       )}
     </PageShell>
   );

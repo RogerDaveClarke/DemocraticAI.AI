@@ -29,7 +29,7 @@ export default function FlagSelectorPopup({ onSelectIreland, onSkip }: FlagSelec
             <div className="text-6xl">🇮🇪</div>
             <div className="text-left flex-1">
               <h3 className="text-xl font-semibold text-gray-900 group-hover:text-green-700">
-                Parliament AI (Ireland)
+                Democratic AI (Ireland)
               </h3>
               <p className="text-sm text-gray-600">Irish Parliament - Dáil and Seanad</p>
             </div>

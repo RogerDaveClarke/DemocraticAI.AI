@@ -161,7 +161,7 @@ export default function Architecture() {
                     Built for transparency, accuracy, and democratic accountability
                   </p>
                   <p className="mt-4 max-w-3xl text-lg leading-8 text-[var(--dai-slate)]">
-                    Parliament AI uses a Retrieval-Augmented Generation (RAG) architecture combined with
+                    Democratic AI uses a Retrieval-Augmented Generation (RAG) architecture combined with
                     responsible AI practices to deliver trustworthy, explainable answers grounded in official
                     parliamentary records.
                   </p>
@@ -255,7 +255,7 @@ export default function Architecture() {
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <p className="inline-flex items-center gap-2">
                   <Info className="h-4 w-4 text-blue-600" />
-                  Parliament AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement through trustworthy AI.
+                  Democratic AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement through trustworthy AI.
                 </p>
                 <button type="button" className="inline-flex items-center gap-1 font-semibold text-[var(--color-teal-600)] hover:text-[var(--color-teal-500)]">
                   Learn more about our mission and methodology

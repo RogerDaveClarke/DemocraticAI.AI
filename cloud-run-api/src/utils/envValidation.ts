@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 /**
  * Backend Environment Variable Validation
  * Validates required environment variables at server startup
@@ -13,6 +16,27 @@ interface EnvConfig {
   required: string[];
   optional: string[];
   production: string[];
+}
+
+export function loadEnvFiles(): void {
+  const candidates = [
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../.env.local'),
+    path.resolve(process.cwd(), '../.env')
+  ];
+
+  for (const envPath of candidates) {
+    if (fs.existsSync(envPath)) {
+      if (typeof process.loadEnvFile === 'function') {
+        try {
+          process.loadEnvFile(envPath);
+        } catch {
+          // ignore non-fatal env load errors
+        }
+      }
+    }
+  }
 }
 
 const ENV_CONFIG: EnvConfig = {
@@ -40,6 +64,8 @@ const ENV_CONFIG: EnvConfig = {
 };
 
 export function validateEnvironment(): ValidationResult {
+  loadEnvFiles();
+
   const result: ValidationResult = {
     isValid: true,
     errors: [],

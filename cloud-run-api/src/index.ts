@@ -1,21 +1,35 @@
-﻿import express from 'express';
+﻿import fs from 'fs';
+import path from 'path';
+
+// Load environment variables from .env.local if present
+if (typeof process.loadEnvFile === 'function') {
+  const localEnvPath = path.resolve(process.cwd(), '.env.local');
+  const parentEnvPath = path.resolve(process.cwd(), '../.env.local');
+  if (fs.existsSync(localEnvPath)) {
+    try { process.loadEnvFile(localEnvPath); } catch (e) {}
+  } else if (fs.existsSync(parentEnvPath)) {
+    try { process.loadEnvFile(parentEnvPath); } catch (e) {}
+  }
+}
+
+import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Firestore } from '@google-cloud/firestore';
 import NodeCache from 'node-cache';
-import trendingTopicsAPI from './trendingTopicsAPI.js';
-import sentimentAnalysisAPI from './sentimentAnalysisAPI.js';
-import memberInsightsAPI from './memberInsightsAPI.js';
-import votingAPI from './votingAPI.js';
-import { setupChatRoutes } from './chatAPI.js';
-import { setupAdminRoutes } from './adminAPI.js';
-import { setupPasswordlessAuthRoutes } from './passwordlessAuthAPI.js';
-import SecurityLogger from './utils/SecurityLogger.js';
-import authRoutes from './routes/auth.js';
-import APIUsageMonitor from './utils/APIUsageMonitor.js';
-import { validateEnvironment, logValidationResults } from './utils/envValidation.js';
+import trendingTopicsAPI from './trendingTopicsAPI';
+import sentimentAnalysisAPI from './sentimentAnalysisAPI';
+import memberInsightsAPI from './memberInsightsAPI';
+import votingAPI from './votingAPI';
+import { setupChatRoutes } from './chatAPI';
+import { setupAdminRoutes } from './adminAPI';
+import { setupPasswordlessAuthRoutes } from './passwordlessAuthAPI';
+import SecurityLogger from './utils/SecurityLogger';
+import authRoutes from './routes/auth';
+import APIUsageMonitor from './utils/APIUsageMonitor';
+import { validateEnvironment, logValidationResults } from './utils/envValidation';
 
 // Validate environment variables before starting the server
 const envValidation = validateEnvironment();

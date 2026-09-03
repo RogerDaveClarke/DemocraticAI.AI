@@ -117,6 +117,34 @@ const getCanonicalTrackerPath = (pathname: string): string | null => {
   return '/home';
 };
 
+const getSectionTitle = (section: Section): string => {
+  const titles: Record<Section, string> = {
+    home: 'Democratic AI Home',
+    research: 'Parliamentary AI Assistant',
+    'research-library': 'Research Library',
+    'saved-research': 'Saved Research',
+    'ai-integrity': 'AI Integrity',
+    'responsible-ai': 'Responsible AI',
+    'platform-status': 'Platform Status',
+    about: 'About',
+    architecture: 'System Architecture',
+    'virtual-dail': 'Virtual Dáil',
+    officials: 'Elected Officials',
+    personas: 'Ministerial Personas',
+    debates: 'Parliamentary Debates',
+    voting: 'Voting Records',
+    qa: 'Questions & Answers',
+    'advanced-ai-analytics': 'Advanced AI Analytics',
+    'bias-detection': 'Bias Detection',
+    attendance: 'Attendance Records',
+    statistics: 'Legislation Explorer',
+    analytics: 'Analytics',
+    admin: 'Platform Admin',
+    fun: 'Fun Zone',
+  };
+  return titles[section] || 'Democratic AI';
+};
+
 function App() {
   const [pathname, setPathname] = useState<string>(() => getPathname());
   const { state: authState, user, redirectError } = useAuth();
@@ -141,7 +169,9 @@ function App() {
 
   useEffect(() => {
     pageView(pathname);
-  }, [pathname]);
+    const title = getSectionTitle(currentSection);
+    document.title = `${title} | Democratic AI`;
+  }, [pathname, currentSection]);
 
   useEffect(() => {
     const canonicalPath = getCanonicalTrackerPath(pathname);
@@ -173,35 +203,6 @@ function App() {
     setPathname('/home');
     event('back_to_home', 'navigation', 'Back to Home');
   };
-
-  const getSectionTitle = (section: Section): string => {
-    const titles: Record<Section, string> = {
-      home: 'Parliament AI Home',
-      research: 'Parliamentary AI Assistant',
-      'research-library': 'Research Library',
-      'saved-research': 'Saved Research',
-      'ai-integrity': 'AI Integrity',
-      'responsible-ai': 'Responsible AI',
-      'platform-status': 'Platform Status',
-      about: 'About',
-      architecture: 'System Architecture',
-      'virtual-dail': 'Virtual DÃ¡il',
-      officials: 'Elected Officials',
-      personas: 'Ministerial Personas',
-      debates: 'Parliamentary Debates',
-      voting: 'Voting Records',
-      qa: 'Questions & Answers',
-      'advanced-ai-analytics': 'Advanced AI Analytics',
-      'bias-detection': 'Bias Detection',
-      attendance: 'Attendance Records',
-      statistics: 'Legislation Explorer',
-      analytics: 'Analytics',
-      admin: 'Platform Admin',
-      fun: 'Fun Zone',
-    };
-    return titles[section];
-  };
-
 
   const renderSection = () => {
     const LoadingSpinner = () => (

@@ -157,7 +157,7 @@ export default function StarterPage({ onEnterTracker }: StarterPageProps) {
                 <Building2 className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-2xl font-bold leading-none">Parliament AI</p>
+                <p className="text-2xl font-bold leading-none">Democratic AI</p>
                 <p className="mt-1 text-xs text-slate-300">Research Platform</p>
               </div>
             </div>
@@ -409,9 +409,9 @@ export default function StarterPage({ onEnterTracker }: StarterPageProps) {
               </section>
 
               <footer className="flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
-                <p className="max-w-3xl">Parliament AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement.</p>
+                <p className="max-w-3xl">Democratic AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement.</p>
                 <div className="flex items-center gap-4">
-                  <span>© 2025 Parliament AI</span>
+                  <span>© 2025 Democratic AI</span>
                   <button type="button" onClick={onEnterTracker} className="hover:text-slate-700">Privacy Policy</button>
                   <button type="button" onClick={onEnterTracker} className="hover:text-slate-700">Terms of Use</button>
                   <button type="button" onClick={onEnterTracker} className="hover:text-slate-700">Contact</button>

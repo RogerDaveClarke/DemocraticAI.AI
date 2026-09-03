@@ -18,13 +18,13 @@ async function resendEmail(to: string, subject: string, html: string): Promise<v
 }
 
 async function sendRejectionEmail(toEmail: string): Promise<void> {
-  await resendEmail(toEmail, "Your Parliament AI access request",
-    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Access request update</h2><p>Thank you for your interest in Parliament AI. After reviewing your request, we are unable to approve access at this time.</p><p>If you believe this is an error, please contact support.</p></div>'
+  await resendEmail(toEmail, "Your Democratic AI access request",
+    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Access request update</h2><p>Thank you for your interest in Democratic AI. After reviewing your request, we are unable to approve access at this time.</p><p>If you believe this is an error, please contact support.</p></div>'
   );
 }
 async function sendSuspensionEmail(toEmail: string, _displayName: string): Promise<void> {
-  await resendEmail(toEmail, "Your Parliament AI account has been suspended",
-    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Account suspended</h2><p>Your Parliament AI account has been suspended. You will not be able to sign in until your account is reactivated.</p><p>If you believe this is an error, please contact support.</p></div>'
+  await resendEmail(toEmail, "Your Democratic AI account has been suspended",
+    '<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2>Account suspended</h2><p>Your Democratic AI account has been suspended. You will not be able to sign in until your account is reactivated.</p><p>If you believe this is an error, please contact support.</p></div>'
   );
 }
 
@@ -33,7 +33,7 @@ if (!adminGetApps().length) {
   adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 }
 
-const db = new Firestore();
+const db = new Firestore({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 
 async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.headers.authorization?.replace('Bearer ', '');

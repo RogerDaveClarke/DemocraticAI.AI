@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface PageShellProps {
   children: ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
 interface SectionCardProps {
@@ -12,10 +13,10 @@ interface SectionCardProps {
   className?: string;
 }
 
-export function PageShell({ children, className }: PageShellProps) {
+export function PageShell({ children, className, contentClassName }: PageShellProps) {
   return (
     <div className={cn('min-h-[calc(100vh-80px)] bg-[var(--dai-canvas)] px-4 py-4 lg:px-6', className)}>
-      <div className="mx-auto max-w-[1280px] space-y-4">{children}</div>
+      <div className={cn('mx-auto max-w-[1280px] space-y-4', contentClassName)}>{children}</div>
     </div>
   );
 }

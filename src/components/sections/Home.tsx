@@ -92,7 +92,7 @@ export default function Home() {
               Democracy made <span className="text-[var(--color-teal-600)]">clear.</span>
             </h1>
             <p className="mt-3 max-w-3xl text-[clamp(0.98rem,1.15vw,1.3rem)] leading-relaxed text-[var(--dai-slate)]">
-              Parliament AI helps you explore parliamentary debates, legislation,
+              Democratic AI helps you explore parliamentary debates, legislation,
               voting records, and representatives using natural language.
               <br />
               Every answer is grounded in official parliamentary records.
@@ -262,7 +262,7 @@ export default function Home() {
               <div>
                 <p className="text-4xl font-semibold text-[var(--dai-ink)]">Politically neutral. Public interest only.</p>
                 <p className="text-sm text-[var(--dai-slate)]">
-                  Parliament AI is politically neutral and non-partisan. Our mission is to promote transparency,
+                  Democratic AI is politically neutral and non-partisan. Our mission is to promote transparency,
                   accountability, and informed civic engagement.
                 </p>
               </div>

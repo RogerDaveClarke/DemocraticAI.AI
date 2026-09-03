@@ -104,6 +104,7 @@ function RequestsTab() {
   const past    = rows.filter(r => r.status !== 'pending');
 
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>;
+  const adminCount = users.filter((user) => user.isAdmin).length;
 
   return (
     <div className="space-y-6">
@@ -241,12 +242,14 @@ function UsersTab() {
       )}
 
       {fetchError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{fetchError}</p>}
-      <p className="text-xs text-slate-400 mb-3">Shows Firebase Authentication accounts only. Google Workspace users appear here after their first sign-in to Parliament AI.</p>
+      <p className="text-xs text-slate-400 mb-3">Shows Firebase Authentication accounts only. Google Workspace users appear here after their first sign-in to Democratic AI.</p>
       <table className="w-full text-sm">
         <thead><tr className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b">
           <th className="pb-2 pr-3">Email</th><th className="pb-2 pr-3">Created</th><th className="pb-2 pr-3">Last sign-in</th><th className="pb-2 pr-3">Status</th><th className="pb-2">Actions</th>
         </tr></thead>
-        <tbody>{users.map(u => (
+        <tbody>{users.map(u => {
+          const isSoleAdmin = u.isAdmin && adminCount === 1;
+          return (
           <tr key={u.uid} className="border-b border-slate-100 hover:bg-slate-50">
             <td className="py-2.5 pr-3">
               <p className="font-medium text-slate-800">{u.email}</p>
@@ -260,14 +263,15 @@ function UsersTab() {
               <div className="flex flex-wrap gap-1">
                 {u.disabled
                   ? <Btn variant="success" small onClick={() => action(`/api/admin/users/${u.uid}/enable`)}><ShieldCheck className="h-3 w-3" />Reactivate</Btn>
-                  : <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/disable`)}><ShieldOff className="h-3 w-3" />Suspend</Btn>
+                  : !isSoleAdmin && <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/disable`)}><ShieldOff className="h-3 w-3" />Suspend</Btn>
                 }
-                <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/revoke-tokens`)}><LogOut className="h-3 w-3" />Force out</Btn>
+                {!isSoleAdmin && <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/revoke-tokens`)}><LogOut className="h-3 w-3" />Force out</Btn>}
                 {!u.isAdmin && <Btn variant="danger" small onClick={() => { if (confirm(`Delete ${u.email}?`)) action(`/api/admin/users/${u.uid}`, 'DELETE'); }}><Trash2 className="h-3 w-3" />Delete</Btn>}
               </div>
             </td>
           </tr>
-        ))}</tbody>
+          );
+        })}</tbody>
       </table>
 
       <div className="border-t border-slate-100 pt-4">
@@ -292,19 +296,26 @@ function UsageTab() {
   const [limitInput, setLimitInput] = useState('50');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     (async () => {
-      const [ur, lr] = await Promise.all([adminFetch('/api/admin/usage'), adminFetch('/api/admin/token-limit')]);
-      if (ur.ok) {
-        const data = await ur.json();
-        const rows: UsageRow[] = Object.entries(data).map(([uid, v]: [string, any]) => ({ uid, ...v }));
-        setUsage(rows.sort((a, b) => b.cost - a.cost));
-      }
-      if (lr.ok) {
-        const d = await lr.json();
-        setLimit(d.dailyQueryLimit);
-        setLimitInput(String(d.dailyQueryLimit));
+      try {
+        const [ur, lr] = await Promise.all([adminFetch('/api/admin/usage'), adminFetch('/api/admin/token-limit')]);
+        if (ur.ok) {
+          const data = await ur.json();
+          const rows: UsageRow[] = Object.entries(data).map(([uid, v]: [string, any]) => ({ uid, ...v }));
+          setUsage(rows.sort((a, b) => b.cost - a.cost));
+        } else {
+          setError(`Could not load usage data (HTTP ${ur.status}).`);
+        }
+        if (lr.ok) {
+          const d = await lr.json();
+          setLimit(d.dailyQueryLimit);
+          setLimitInput(String(d.dailyQueryLimit));
+        }
+      } catch {
+        setError('Could not reach the admin usage API.');
       }
       setLoading(false);
     })();
@@ -336,7 +347,7 @@ function UsageTab() {
           <h3 className="text-sm font-semibold text-slate-700">Token usage (all time)</h3>
           <span className="text-xs text-slate-400">Total estimated cost: <strong className="text-slate-700">${totalCost.toFixed(4)}</strong></span>
         </div>
-        <table className="w-full text-sm">
+        {error ? <p className="text-sm text-rose-600">{error}</p> : usage.length === 0 ? <p className="text-sm text-slate-500">No completed research requests have been recorded yet.</p> : <table className="w-full text-sm">
           <thead><tr className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b">
             <th className="pb-2 pr-4">User</th><th className="pb-2 pr-4">Queries</th><th className="pb-2 pr-4">Tokens in</th><th className="pb-2 pr-4">Tokens out</th><th className="pb-2">Est. cost</th>
           </tr></thead>
@@ -349,7 +360,7 @@ function UsageTab() {
               <td className="py-2.5 font-medium">${r.cost.toFixed(4)}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table>}
       </div>
     </div>
   );

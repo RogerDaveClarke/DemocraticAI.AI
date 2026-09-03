@@ -73,12 +73,12 @@ export default function About() {
                 <Users className="h-14 w-14 text-sky-700" />
               </div>
             </div>
-            <h1 className="text-5xl font-bold tracking-tight text-[var(--dai-ink)] md:text-6xl">About Parliament AI</h1>
+            <h1 className="text-5xl font-bold tracking-tight text-[var(--dai-ink)] md:text-6xl">About Democratic AI</h1>
             <p className="mt-2 text-2xl font-semibold text-[var(--color-teal-600)] md:text-3xl">
               Mission and methodology
             </p>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-[var(--dai-slate)]">
-              Parliament AI is a non-partisan research platform that makes Irish parliamentary activity
+              Democratic AI is a non-partisan research platform that makes Irish parliamentary activity
               accessible, searchable, and explainable. We combine official Oireachtas records with
               Retrieval-Augmented Generation (RAG) to deliver trustworthy civic insights grounded in
               verifiable data.
@@ -146,7 +146,7 @@ export default function About() {
                   Official records remain authoritative. AI assists — it does not decide.
                 </p>
                 <p className="mt-1 text-[var(--dai-slate)]">
-                  Parliament AI does not generate opinions or scores. It surfaces evidence so citizens
+                  Democratic AI does not generate opinions or scores. It surfaces evidence so citizens
                   can reach their own informed conclusions.
                 </p>
               </div>
@@ -156,7 +156,7 @@ export default function About() {
           <section className="flex flex-col gap-2 border-t border-[var(--dai-border)] pt-4 text-sm text-[var(--dai-slate)] xl:flex-row xl:items-center xl:justify-between">
             <p className="inline-flex items-center gap-2">
               <Info className="h-4 w-4 text-sky-600" />
-              Parliament AI is politically neutral. Our mission is to promote transparency, accountability, and informed civic engagement.
+              Democratic AI is politically neutral. Our mission is to promote transparency, accountability, and informed civic engagement.
             </p>
             <p>Last updated: May 27, 2025</p>
           </section>

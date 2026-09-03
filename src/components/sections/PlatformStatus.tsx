@@ -315,7 +315,7 @@ export default function PlatformStatus() {
         <section className="grid grid-cols-1 gap-3 rounded-xl border border-[var(--dai-border)] bg-white p-4 text-xs text-[var(--dai-slate)] xl:grid-cols-3">
           <div className="inline-flex items-start gap-2">
             <Sparkles className="mt-0.5 h-4 w-4 text-teal-600" />
-            <p>Parliament AI is committed to transparency, accuracy, and responsible use of AI. Learn more about our Responsible AI principles.</p>
+            <p>Democratic AI is committed to transparency, accuracy, and responsible use of AI. Learn more about our Responsible AI principles.</p>
           </div>
           <div>
             <p className="font-semibold text-[var(--dai-slate)]">Questions or issues with the data?</p>

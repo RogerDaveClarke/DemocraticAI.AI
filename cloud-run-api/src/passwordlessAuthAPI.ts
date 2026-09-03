@@ -65,13 +65,28 @@ export async function sendPasswordlessEmail(
   authTrace('firebase-email-accepted');
 }
 
+/**
+ * Raised when the identity backend itself is unreachable or misconfigured
+ * (for example missing Application Default Credentials). This is distinct from
+ * "this email has no account", which is a normal, expected outcome.
+ */
+class AuthBackendError extends Error {}
+
 async function approvedUser(email: string): Promise<UserRecord | null> {
   let user: UserRecord;
   try {
     user = await getAuth().getUserByEmail(email);
-  } catch {
-    authTrace('user-not-found');
-    return null;
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code;
+    if (code === 'auth/user-not-found') {
+      authTrace('user-not-found');
+      return null;
+    }
+    // Credential, network or project-config failures must not masquerade as
+    // "no such user" - that silently drops the sign-in email with no signal.
+    throw new AuthBackendError(
+      `Identity lookup failed (${code ?? 'unknown'}): ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   if (user.disabled) {
@@ -113,6 +128,14 @@ async function requestEmailLink(req: Request, res: Response): Promise<void> {
     if (user) await sendPasswordlessEmail(email);
   } catch (error) {
     console.error('[auth] Passwordless sign-in email failed:', error instanceof Error ? error.message : error);
+    if (error instanceof AuthBackendError) {
+      // The identity backend is down/misconfigured for every caller, so this
+      // reveals nothing about whether the address has an account.
+      res.status(503).json({
+        message: 'Sign-in is temporarily unavailable. Please try again shortly.',
+      });
+      return;
+    }
   }
 
   res.json(genericResponse);

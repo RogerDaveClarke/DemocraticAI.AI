@@ -76,11 +76,20 @@ export default function SignInPage({ redirectError }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-      if (!response.ok) throw new Error('request-failed');
+      if (!response.ok) {
+        // The service is reachable but refused the request - prefer its own
+        // message so a real outage is not reported as a generic retry hint.
+        const serverMessage = await response.json().then(body => body?.message).catch(() => null);
+        setError(serverMessage || 'We could not request a sign-in link. Please try again later.');
+        return;
+      }
       window.localStorage.setItem(EMAIL_STORAGE_KEY, email.trim().toLowerCase());
       setLinkSent(true);
     } catch {
-      setError('We could not request a sign-in link. Please try again later.');
+      // fetch itself threw: the API is unreachable (not running, wrong port, CORS).
+      setError(import.meta.env.DEV
+        ? `Could not reach the sign-in service at ${API}. Is the API running?`
+        : 'We could not request a sign-in link. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +141,7 @@ export default function SignInPage({ redirectError }: Props) {
   const displayError = error || (redirectError ? friendlyError(redirectError) : '');
 
   return (
-    <AuthFrame title="Parliament AI" subtitle="Research platform for democratic institutions">
+    <AuthFrame title="Democratic AI" subtitle="Research platform for democratic institutions">
       {linkSent ? (
         <div className="text-center space-y-3">
           <Mail className="h-8 w-8 text-[#14b8a6] mx-auto" />

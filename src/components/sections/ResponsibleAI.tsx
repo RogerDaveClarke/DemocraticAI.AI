@@ -130,7 +130,7 @@ export default function ResponsibleAI() {
                 Building trustworthy AI for democratic transparency
               </p>
               <p className="mt-5 max-w-3xl text-lg leading-8 text-[var(--dai-slate)]">
-                Parliament AI is built on a foundation of trust, transparency, and accountability.
+                Democratic AI is built on a foundation of trust, transparency, and accountability.
                 We use Retrieval-Augmented Generation (RAG) and responsible AI practices to ensure
                 our responses are accurate, explainable, and verifiable so you can make informed civic decisions.
               </p>
@@ -155,7 +155,7 @@ export default function ResponsibleAI() {
             </section>
 
             <section>
-              <h2 className="mb-4 text-3xl font-semibold text-[var(--dai-ink)]">How Parliament AI Works</h2>
+              <h2 className="mb-4 text-3xl font-semibold text-[var(--dai-ink)]">How Democratic AI Works</h2>
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr]">
                 {workflowSteps.map((step, index) => {
                   const Icon = step.icon;
@@ -191,7 +191,7 @@ export default function ResponsibleAI() {
                     Every step is designed to ensure accuracy, accountability, and public trust.
                   </p>
                   <p className="mt-1 text-[var(--dai-slate)]">
-                    Parliament AI does not generate opinions, only evidence-based insights.
+                    Democratic AI does not generate opinions, only evidence-based insights.
                   </p>
                 </div>
               </div>
@@ -200,7 +200,7 @@ export default function ResponsibleAI() {
             <section className="flex flex-col gap-2 border-t border-[var(--dai-border)] pt-4 text-sm text-[var(--dai-slate)] xl:flex-row xl:items-center xl:justify-between">
               <p className="inline-flex items-center gap-2">
                 <Info className="h-4 w-4 text-sky-600" />
-                Parliament AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement.
+                Democratic AI is politically neutral and non-partisan. Our mission is to promote transparency, accountability, and informed civic engagement.
               </p>
               <p>Last updated: May 27, 2025</p>
             </section>

@@ -100,7 +100,7 @@ export default function AppSidebar({ currentSection, onBackToHome, onSectionChan
         <div className="mb-2 flex items-start gap-3">
           <Landmark className="h-8 w-8 text-[var(--color-teal-500)]" />
           <div>
-            <h1 className="whitespace-nowrap text-[24px] font-bold leading-tight text-white">Parliament AI</h1>
+            <h1 className="whitespace-nowrap text-[24px] font-bold leading-tight text-white">Democratic AI</h1>
             <p className="mt-1 text-[13px] leading-none text-slate-300">Research Platform</p>
           </div>
         </div>

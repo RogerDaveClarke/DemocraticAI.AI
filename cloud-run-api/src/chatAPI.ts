@@ -104,7 +104,7 @@ class ChatAPI {
   };
 
   constructor() {
-    this.db = new Firestore();
+    this.db = new Firestore({ projectId: BQ_PROJECT });
     this.bq = new BigQuery({ projectId: BQ_PROJECT });
     // 10-minute TTL; checked every 2 minutes
     this.searchCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
@@ -237,6 +237,7 @@ class ChatAPI {
       execution = {
         id: this.generateExecutionId(),
         sessionId,
+        userId: (req as Request & { uid?: string }).uid,
         query: sanitizedQuery,
         originalLanguage: this.detectLanguage(sanitizedQuery),
         targetLanguage: userLanguage,
@@ -340,7 +341,7 @@ class ChatAPI {
       const fullPrompt = `${prompt}\n\nContext: ${JSON.stringify(context)}\n\nQuery: ${query}`;
       const inputTokens = this.estimateTokens(fullPrompt);
       const text = await this.generateWithModelFallback(
-        ['gemini-2.0-flash-001', 'gemini-1.5-flash', 'gemini-1.5-flash-002'],
+        ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
         fullPrompt,
         generationConfig
       );
@@ -392,7 +393,7 @@ class ChatAPI {
       const fullPrompt = `${prompt}\n\nContext: ${JSON.stringify(context)}\n\nQuery: ${query}`;
       const inputTokens = this.estimateTokens(fullPrompt);
       const text = await this.generateWithModelFallback(
-        ['gemini-1.5-pro-002', 'gemini-1.5-pro', 'gemini-2.0-flash-001'],
+        ['gemini-2.5-pro', 'gemini-2.5-flash'],
         fullPrompt,
         generationConfig
       );
@@ -947,7 +948,7 @@ class ChatAPI {
         html: [
           '<div style="font-family:sans-serif;max-width:480px;margin:auto;color:#1e293b">',
           '<h2 style="color:#0b1f3a">New Access Request</h2>',
-          '<p><strong>' + requesterEmail + '</strong> has requested access to Parliament AI.</p>',
+          '<p><strong>' + requesterEmail + '</strong> has requested access to Democratic AI.</p>',
           '<p style="text-align:center;margin:32px 0">',
           '  <a href="' + adminPanelUrl + '" ',
           '     style="background:#14b8a6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">',

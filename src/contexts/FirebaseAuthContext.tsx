@@ -203,8 +203,8 @@ export function FirebaseAuthProvider({ children }: FirebaseAuthProviderProps) {
       console.log('TOTP secret generated');
       
       // Generate QR code URL for authenticator apps
-      const accountName = currentUser.email || currentUser.uid || 'user@parliament';
-      const issuer = 'Parliament AI';
+      const accountName = currentUser.email || currentUser.uid || 'user@democraticai';
+      const issuer = 'Democratic AI';
       
       console.log('Generating QR code URL for:', accountName);
       const qrCodeUrl = totpSecret.generateQrCodeUrl(accountName, issuer);

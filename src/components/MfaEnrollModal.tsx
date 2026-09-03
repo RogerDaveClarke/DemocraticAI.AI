@@ -29,7 +29,7 @@ export default function MfaEnrollModal({ user, onComplete }: Props) {
       const session    = await multiFactor(user).getSession();
       const totpSecret = await TotpMultiFactorGenerator.generateSecret(session);
       setSecret(totpSecret);
-      setQrUrl(totpSecret.generateQrCodeUrl(user.email ?? 'user', 'Parliament AI'));
+      setQrUrl(totpSecret.generateQrCodeUrl(user.email ?? 'user', 'Democratic AI'));
       setManualKey(totpSecret.secretKey);
       setStep('scan');
     } catch (e: any) {

@@ -39,7 +39,7 @@ if (process.env.LEGACY_AUTH_ROUTES === 'true' && (!JWT_SECRET || !JWT_REFRESH_SE
 }
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-const APP_NAME = 'Parliament Explorer';
+const APP_NAME = 'Democratic AI';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const MICROSOFT_TENANT_ID = process.env.MICROSOFT_TENANT_ID || '';
 // const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
