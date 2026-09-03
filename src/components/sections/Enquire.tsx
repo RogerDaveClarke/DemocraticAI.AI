@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { track } from '@/utils/analytics';
-import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search, X } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search, Settings2, X, Plus, Pencil, Trash2, Bookmark, Share2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PromptLibrary from '../PromptLibrary';
 import { useLoadingAnnouncer } from '../../hooks/accessibilityHooks';
@@ -18,6 +18,7 @@ interface Message {
   executionId?: string;
   feedbackGiven?: boolean;
   sources?: SearchDocument[];
+  savedPromptId?: string;
   metadata?: {
     modelUsed: string;
     cost: number;
@@ -64,9 +65,66 @@ interface SearchDocument {
   relevance?: number;
 }
 
+type RecordType = SearchDocument['source'];
+type ResearchSettings = {
+  responseLength: 'brief' | 'standard' | 'detailed';
+  precision: 'focused' | 'balanced' | 'exploratory';
+  sourceBreadth: 10 | 20 | 50;
+  dateRange: 'all' | 'year' | 'fiveYears';
+  recordTypes: RecordType[];
+  answerFormat: 'briefing' | 'timeline' | 'comparison' | 'plainLanguage';
+  citationDetail: 'sources' | 'claims';
+  language: 'en' | 'ga';
+};
+
+const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
+  responseLength: 'standard',
+  precision: 'balanced',
+  sourceBreadth: 20,
+  dateRange: 'all',
+  recordTypes: ['bill', 'debate', 'question'],
+  answerFormat: 'briefing',
+  citationDetail: 'sources',
+  language: 'en',
+};
+
+interface ResearchSkill {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  isBuiltIn?: boolean;
+}
+
+const BUILT_IN_SKILLS: ResearchSkill[] = [
+  {
+    id: 'policy-timeline',
+    name: 'Policy timeline',
+    description: 'Trace policy changes over time.',
+    instructions: 'Create a dated policy timeline. Identify legislative actions, stated positions, and changes over time. Separate direct record evidence from interpretation.',
+    isBuiltIn: true,
+  },
+  {
+    id: 'bill-comparison',
+    name: 'Bill comparison',
+    description: 'Compare legislation and amendments.',
+    instructions: 'Compare the relevant bills, versions, amendments, stages, and positions. State clearly when the records do not contain a requested comparison point.',
+    isBuiltIn: true,
+  },
+  {
+    id: 'vote-analysis',
+    name: 'Vote analysis',
+    description: 'Analyse divisions and positions.',
+    instructions: 'Analyse voting and recorded positions using only the supplied records. Distinguish recorded votes from discussion or inferred political positions.',
+    isBuiltIn: true,
+  },
+];
+
+const USER_SKILLS_STORAGE_KEY = 'research-user-skills';
 
 
-const FEEDBACK_ENABLED = import.meta.env.VITE_FEEDBACK_ENABLED === 'true';
+
+const FEEDBACK_ENABLED = true;
 
 const FEEDBACK_CATEGORIES = [
   "Response didn't seem relevant",
@@ -91,6 +149,16 @@ export default function Enquire() {
   const [chatPanelWidth, setChatPanelWidth] = useState(70);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1280px)').matches);
   const [deepResearch, setDeepResearch] = useState(false);
+  const [showResearchSettings, setShowResearchSettings] = useState(false);
+  const [researchSettings, setResearchSettings] = useState<ResearchSettings>(DEFAULT_RESEARCH_SETTINGS);
+  const [userSkills, setUserSkills] = useState<ResearchSkill[]>([]);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>();
+  const [skillEditor, setSkillEditor] = useState<{ id?: string; name: string; description: string; instructions: string; isBuiltIn?: boolean } | null>(null);
+  const [savedPromptId, setSavedPromptId] = useState<string | undefined>();
+  const [savePromptDialog, setSavePromptDialog] = useState(false);
+  const [promptTitle, setPromptTitle] = useState('');
+  const [sharePrompt, setSharePrompt] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
   const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, cost: 0, requests: 0, lastTokens: 0, lastCost: 0 });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -130,6 +198,15 @@ export default function Enquire() {
     };
 
     fetchPopularPrompts();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const savedSkills = localStorage.getItem(USER_SKILLS_STORAGE_KEY);
+      if (savedSkills) setUserSkills(JSON.parse(savedSkills) as ResearchSkill[]);
+    } catch (error) {
+      console.error('Failed to load user research skills:', error);
+    }
   }, []);
 
   const trackPromptUsage = async (prompt: string) => {
@@ -212,16 +289,26 @@ export default function Enquire() {
     'Only make claims supported by the supplied context. Under Sources, cite records using their titles; do not invent URLs.',
   ].join('\n');
 
-  const buildSystemPrompt = (promptId?: string, isDeepResearch = false): string => {
+  const buildSystemPrompt = (promptId?: string, isDeepResearch = false, settings = DEFAULT_RESEARCH_SETTINGS, skill?: ResearchSkill): string => {
     const deepResearchInstruction = isDeepResearch
       ? '\n\nDeep research mode: compare evidence across the supplied records, identify changes over time, and distinguish direct evidence from interpretation.'
       : '';
+    const formatInstructions: Record<ResearchSettings['answerFormat'], string> = {
+      briefing: 'a concise policy briefing',
+      timeline: 'a chronological timeline',
+      comparison: 'a direct comparison of positions or changes',
+      plainLanguage: 'a plain-language explanation',
+    };
+    const settingsInstruction = `\n\nAnswer in ${settings.language === 'ga' ? 'Irish' : 'English'} as ${formatInstructions[settings.answerFormat]}. ${settings.citationDetail === 'claims' ? 'Associate each material claim with the relevant source title.' : 'Provide a source list for the analysis.'}`;
+    const skillInstruction = skill
+      ? `\n\nUser-defined research skill: ${skill.name}. Apply this workflow only when it is consistent with the supplied official records and source-grounding rules:\n${skill.instructions}`
+      : '';
     if (!promptId) {
-      return `${defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}`;
+      return `${defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}${settingsInstruction}${skillInstruction}`;
     }
 
     const selectedPrompt = promptLibrary.find(prompt => prompt.id === promptId);
-    return `${selectedPrompt?.systemPrompt || defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}`;
+    return `${selectedPrompt?.systemPrompt || defaultSystemPrompt}\n\n${responseStructureInstruction}${deepResearchInstruction}${settingsInstruction}${skillInstruction}`;
   };
 
   const getConfidenceLabel = (confidence: number): 'High' | 'Medium' | 'Low' => {
@@ -359,15 +446,24 @@ export default function Enquire() {
   const executeQuery = async (
     query: string,
     promptId?: string,
-    isDeepResearch = false
+    isDeepResearch = false,
+    settings = DEFAULT_RESEARCH_SETTINGS,
+    skill?: ResearchSkill,
+    associatedSavedPromptId?: string
   ): Promise<{ response: Message; execution: PromptExecution }> => {
     const startTime = Date.now();
+    const dateFrom = settings.dateRange === 'all'
+      ? undefined
+      : new Date(new Date().setFullYear(new Date().getFullYear() - (settings.dateRange === 'year' ? 1 : 5))).toISOString().slice(0, 10);
     const searchResponse = await apiPost<{ documents?: SearchDocument[] }>('/api/search', {
       query,
-      limit: isDeepResearch ? 50 : 20,
+      limit: isDeepResearch ? 50 : settings.sourceBreadth,
+      filters: dateFrom ? { dateFrom } : undefined,
     });
-    const context = searchResponse.documents || [];
+    const context = (searchResponse.documents || []).filter((document) => settings.recordTypes.includes(document.source));
     const selectedModel = isDeepResearch ? 'gemini-pro' : routeToOptimalModel(query, context);
+    const outputTokens = settings.responseLength === 'brief' ? 768 : settings.responseLength === 'detailed' ? 3072 : 1536;
+    const temperature = settings.precision === 'focused' ? 0 : settings.precision === 'exploratory' ? 0.25 : 0.1;
     
     const execution: PromptExecution = {
       id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -375,7 +471,7 @@ export default function Enquire() {
       sessionId: sessionId.current,
       query,
       originalLanguage: detectLanguage(query),
-      targetLanguage: userLanguage,
+      targetLanguage: settings.language,
       modelUsed: selectedModel,
       startTime: new Date(),
       tokensInput: estimateTokens(query),
@@ -402,10 +498,13 @@ export default function Enquire() {
         query,
         context,
         model: selectedModel,
-        userLanguage,
-        prompt: buildSystemPrompt(promptId, isDeepResearch),
+        userLanguage: settings.language,
+        prompt: buildSystemPrompt(promptId, isDeepResearch, settings, skill),
         sessionId: sessionId.current,
-        promptId
+        promptId,
+        savedPromptId: associatedSavedPromptId,
+        filters: { dateFrom, sourceTypes: settings.recordTypes },
+        generationSettings: { maxOutputTokens: outputTokens, temperature },
       });
 
       execution.endTime = new Date();
@@ -424,6 +523,7 @@ export default function Enquire() {
         timestamp: new Date(),
         executionId: apiResponse.executionId || execution.id,
         sources: context,
+        savedPromptId: associatedSavedPromptId,
         metadata: {
           modelUsed: selectedModel,
           cost: apiResponse.cost,
@@ -492,10 +592,13 @@ export default function Enquire() {
     setInputValue('');
     const promptToUse = selectedPromptId;
     const deepResearchToUse = deepResearch;
+    const settingsToUse = researchSettings;
+    const savedPromptToUse = savedPromptId;
+    const selectedSkill = [...BUILT_IN_SKILLS, ...userSkills].find((skill) => skill.id === selectedSkillId);
     setSelectedPromptId(undefined);
 
     try {
-      const { response } = await executeQuery(userMessage.text, promptToUse, deepResearchToUse);
+      const { response } = await executeQuery(userMessage.text, promptToUse, deepResearchToUse, settingsToUse, selectedSkill, savedPromptToUse);
       setMessages(prev => [...prev, response]);
       announceComplete('Search results loaded successfully');
     } catch (error) {
@@ -574,15 +677,39 @@ export default function Enquire() {
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedbackGiven: true } : m));
   }, [executionsMap]);
 
-  const doThumbsUp = useCallback((messageId: string, executionId?: string) => {
+  const rateSavedPrompt = useCallback(async (promptId: string, executionId: string | undefined, rating: 1 | -1) => {
+    if (!executionId) return;
+    try { await apiPost(`/api/prompts/${promptId}/rating`, { executionId, rating }); }
+    catch (error) { console.error('Failed to rate saved prompt:', error); }
+  }, []);
+
+  const doThumbsUp = useCallback((messageId: string, executionId?: string, promptId?: string) => {
     setFeedbackStates(prev => ({ ...prev, [messageId]: { sentiment: 'up', panelOpen: false, category: '', verbatim: '', submitted: true } }));
     sendFeedback(messageId, 'up', executionId);
-  }, [sendFeedback]);
+    if (promptId) void rateSavedPrompt(promptId, executionId, 1);
+  }, [rateSavedPrompt, sendFeedback]);
 
-  const doThumbsDown = useCallback((messageId: string, executionId?: string) => {
+  const doThumbsDown = useCallback((messageId: string, executionId?: string, promptId?: string) => {
     setFeedbackStates(prev => ({ ...prev, [messageId]: { sentiment: 'down', panelOpen: false, category: '', verbatim: '', submitted: true } }));
     sendFeedback(messageId, 'down', executionId);
-  }, [sendFeedback]);
+    if (promptId) void rateSavedPrompt(promptId, executionId, -1);
+  }, [rateSavedPrompt, sendFeedback]);
+
+  const savePrompt = async () => {
+    if (!inputValue.trim()) return;
+    setSavingPrompt(true);
+    try {
+      const result = await apiPost<{ id: string }>('/api/prompts', { text: inputValue.trim(), title: promptTitle, shared: sharePrompt });
+      setSavedPromptId(result.id);
+      setSavePromptDialog(false);
+      setPromptTitle('');
+      setSharePrompt(false);
+    } catch (error) {
+      console.error('Failed to save prompt:', error);
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
 
   const toggleFeedbackPanel = useCallback((messageId: string) => {
     setFeedbackStates(prev => {
@@ -672,12 +799,50 @@ export default function Enquire() {
     setChatPanelWidth((currentWidth) => Math.min(78, Math.max(28, currentWidth + (event.key === 'ArrowRight' ? 2 : -2))));
   };
 
+  const allSkills = [...BUILT_IN_SKILLS, ...userSkills];
+
+  const saveSkill = () => {
+    if (!skillEditor?.name.trim() || !skillEditor.instructions.trim()) return;
+    const savedSkill: ResearchSkill = {
+      id: skillEditor.id ?? `user-skill-${Date.now()}`,
+      name: skillEditor.name.trim().slice(0, 80),
+      description: skillEditor.description.trim().slice(0, 180),
+      instructions: skillEditor.instructions.trim().slice(0, 1200),
+    };
+    const nextSkills = skillEditor.id
+      ? userSkills.map((skill) => skill.id === skillEditor.id ? savedSkill : skill)
+      : [...userSkills, savedSkill];
+    setUserSkills(nextSkills);
+    localStorage.setItem(USER_SKILLS_STORAGE_KEY, JSON.stringify(nextSkills));
+    setSelectedSkillId(savedSkill.id);
+    setSkillEditor(null);
+  };
+
+  const deleteSkill = (skillId: string) => {
+    const nextSkills = userSkills.filter((skill) => skill.id !== skillId);
+    setUserSkills(nextSkills);
+    localStorage.setItem(USER_SKILLS_STORAGE_KEY, JSON.stringify(nextSkills));
+    if (selectedSkillId === skillId) setSelectedSkillId(undefined);
+  };
+
+  const openSkillDetails = (skillId: string) => {
+    if (!skillId) {
+      setSelectedSkillId(undefined);
+      setSkillEditor(null);
+      return;
+    }
+    const skill = allSkills.find((item) => item.id === skillId);
+    if (!skill) return;
+    setSelectedSkillId(skill.id);
+    setSkillEditor({ ...skill, isBuiltIn: skill.isBuiltIn });
+  };
+
   return (
     <PageShell className="h-[calc(100vh-80px)] p-5" contentClassName="h-full max-w-none">
       <LoadingAnnouncementRegion />
 
-      <div ref={workspaceRef} className="grid h-full grid-cols-1 gap-4 xl:gap-0" style={isDesktop ? { gridTemplateColumns: `minmax(20rem, 1fr) 12px minmax(0, ${chatPanelWidth}%)` } as CSSProperties : undefined}>
-        <section className="order-2 flex min-h-0 flex-col rounded-xl border border-[var(--dai-border)] bg-white shadow-sm xl:order-3">
+      <div ref={workspaceRef} className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden xl:gap-0" style={isDesktop ? { gridTemplateColumns: `minmax(20rem, 1fr) 12px minmax(0, ${chatPanelWidth}%)` } as CSSProperties : undefined}>
+        <section className="order-2 flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--dai-border)] bg-white shadow-sm xl:order-3">
           <div className="border-b border-[var(--dai-border)] bg-white px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -702,42 +867,25 @@ export default function Enquire() {
             </div>
           </div>
 
-          <div className={`min-h-0 overflow-y-auto p-4 ${messages.length === 0 ? 'flex-none' : 'flex-1'}`}>
-            {messages.length === 0 ? (
-              <>
-                <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-100">
-                    <Search size={22} className="text-slate-400" />
-                  </div>
-                  <h3 className="mb-1 text-sm font-semibold text-[var(--dai-ink)]">Ask a research question</h3>
-                  <p className="max-w-xs text-xs leading-relaxed text-[var(--dai-slate)]">Ask anything about parliamentary debates, legislation, voting records, or representatives.</p>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    'How has housing policy evolved over the last 5 years?',
-                    'What were the main arguments in today\'s debates?',
-                  ].map((prompt, idx) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => handlePromptSelect(prompt, `quick_${idx}`)}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-[var(--dai-slate)] transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
+          <div className={`min-h-0 overscroll-contain overflow-y-auto ${messages.length === 0 ? 'flex-none' : 'flex-1 px-5 py-4'}`}>
+            {messages.length > 0 && (
               <div className="space-y-3">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`rounded-lg border p-3 ${message.sender === 'user' ? 'border-[#1b3a5c] bg-[var(--color-navy-950)] text-white' : 'border-slate-200 bg-slate-50 text-[var(--dai-ink)]'}`}
+                    className={message.sender === 'user'
+                      ? 'rounded-lg border border-[#1b3a5c] bg-[var(--color-navy-950)] p-3 text-white'
+                      : 'border-b border-slate-200 py-2 text-[var(--dai-ink)] last:border-b-0'}
                   >
                     {message.sender === 'bot' ? (
-                      <div className="prose prose-sm max-w-none prose-headings:mb-2 prose-headings:mt-5 prose-headings:text-[var(--dai-ink)] prose-p:my-3 prose-p:leading-6 prose-li:my-1">
-                        <ReactMarkdown>
+                      <div className="prose prose-sm max-w-none text-[13px] leading-5 prose-headings:mb-2 prose-headings:mt-5 prose-headings:text-sm prose-headings:font-semibold prose-headings:text-[var(--dai-ink)] prose-p:my-2 prose-p:leading-5 prose-li:my-1 prose-ul:my-2">
+                        <ReactMarkdown components={{
+                          p: ({ children }) => {
+                            const content = Array.isArray(children) ? children : [children];
+                            const isSectionLabel = content.length === 1 && typeof content[0] === 'object' && content[0] !== null && 'type' in content[0] && content[0].type === 'strong';
+                            return <p className={isSectionLabel ? 'mb-3 mt-6 font-semibold text-[var(--dai-ink)] first:mt-0' : undefined}>{children}</p>;
+                          },
+                        }}>
                           {message.text}
                         </ReactMarkdown>
                       </div>
@@ -770,13 +918,13 @@ export default function Enquire() {
                             return (
                               <>
                                 <button
-                                  onClick={() => !submitted && doThumbsUp(message.id, message.executionId)}
+                                  onClick={() => !submitted && doThumbsUp(message.id, message.executionId, message.savedPromptId)}
                                   aria-label="Helpful"
                                   disabled={submitted}
                                   className={`inline-flex items-center gap-1 rounded-md px-2 py-1 transition ${submitted && fs?.sentiment === 'up' ? 'text-teal-600' : 'text-[var(--dai-slate)] hover:bg-slate-100'} disabled:opacity-40`}
                                 ><ThumbsUp size={12} /></button>
                                 <button
-                                  onClick={() => !submitted && doThumbsDown(message.id, message.executionId)}
+                                  onClick={() => !submitted && doThumbsDown(message.id, message.executionId, message.savedPromptId)}
                                   aria-label="Not helpful"
                                   disabled={submitted}
                                   className={`inline-flex items-center gap-1 rounded-md px-2 py-1 transition ${submitted && fs?.sentiment === 'down' && !fs.panelOpen ? 'text-rose-500' : 'text-[var(--dai-slate)] hover:bg-slate-100'} disabled:opacity-40`}
@@ -860,7 +1008,7 @@ export default function Enquire() {
                 </button>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowPromptLibrary(!showPromptLibrary)}
@@ -869,6 +1017,9 @@ export default function Enquire() {
                   >
                     <Lightbulb size={12} />
                     Research Library
+                  </button>
+                  <button type="button" onClick={() => { setPromptTitle(inputValue.trim().slice(0, 80)); setSavePromptDialog(true); }} disabled={!inputValue.trim()} className="inline-flex items-center gap-1 rounded-full border border-[var(--dai-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--dai-slate)] hover:bg-slate-50 disabled:opacity-50">
+                    <Bookmark size={12} /> Save prompt
                   </button>
                   <button
                     type="button"
@@ -880,11 +1031,79 @@ export default function Enquire() {
                     Deep Research
                     <span className={`inline-flex h-3.5 w-7 rounded-full p-0.5 transition ${deepResearch ? 'bg-teal-600' : 'bg-slate-200'}`}><span className={`h-2.5 w-2.5 rounded-full bg-white transition ${deepResearch ? 'translate-x-3.5' : ''}`} /></span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowResearchSettings((open) => !open)}
+                    aria-label="Research settings"
+                    aria-expanded={showResearchSettings}
+                    title="Research settings"
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition ${showResearchSettings ? 'border-teal-300 bg-teal-50 text-teal-700' : 'border-[var(--dai-border)] bg-white text-[var(--dai-slate)] hover:bg-slate-50'}`}
+                  >
+                    <Settings2 size={14} />
+                  </button>
+                  {showResearchSettings && (
+                    <div className="absolute left-0 top-full z-30 mt-2 w-[min(30rem,calc(100vw-3rem))] rounded-lg border border-[var(--dai-border)] bg-white p-4 shadow-lg">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-[var(--dai-ink)]">Research settings</h3>
+                        <button type="button" onClick={() => setResearchSettings(DEFAULT_RESEARCH_SETTINGS)} className="text-xs font-medium text-teal-700 hover:text-teal-900">Reset</button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <label className="space-y-1 text-[var(--dai-slate)]">Response length
+                          <select value={researchSettings.responseLength} onChange={(event) => setResearchSettings((settings) => ({ ...settings, responseLength: event.target.value as ResearchSettings['responseLength'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="brief">Brief</option><option value="standard">Standard</option><option value="detailed">Detailed</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Precision
+                          <select value={researchSettings.precision} onChange={(event) => setResearchSettings((settings) => ({ ...settings, precision: event.target.value as ResearchSettings['precision'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="focused">Focused</option><option value="balanced">Balanced</option><option value="exploratory">Exploratory</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Source breadth
+                          <select value={researchSettings.sourceBreadth} onChange={(event) => setResearchSettings((settings) => ({ ...settings, sourceBreadth: Number(event.target.value) as ResearchSettings['sourceBreadth'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value={10}>10 records</option><option value={20}>20 records</option><option value={50}>50 records</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Date range
+                          <select value={researchSettings.dateRange} onChange={(event) => setResearchSettings((settings) => ({ ...settings, dateRange: event.target.value as ResearchSettings['dateRange'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="all">All records</option><option value="year">Last year</option><option value="fiveYears">Last 5 years</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Answer format
+                          <select value={researchSettings.answerFormat} onChange={(event) => setResearchSettings((settings) => ({ ...settings, answerFormat: event.target.value as ResearchSettings['answerFormat'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="briefing">Briefing</option><option value="timeline">Timeline</option><option value="comparison">Comparison</option><option value="plainLanguage">Plain language</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Citation detail
+                          <select value={researchSettings.citationDetail} onChange={(event) => setResearchSettings((settings) => ({ ...settings, citationDetail: event.target.value as ResearchSettings['citationDetail'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="sources">Source list</option><option value="claims">Per material claim</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[var(--dai-slate)]">Answer language
+                          <select value={researchSettings.language} onChange={(event) => setResearchSettings((settings) => ({ ...settings, language: event.target.value as ResearchSettings['language'] }))} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-[var(--dai-ink)]">
+                            <option value="en">English</option><option value="ga">Irish</option>
+                          </select>
+                        </label>
+                      </div>
+                      <fieldset className="mt-3 border-t border-[var(--dai-border)] pt-3">
+                        <legend className="mb-2 text-xs font-medium text-[var(--dai-slate)]">Record types</legend>
+                        <div className="flex flex-wrap gap-3">
+                          {(['bill', 'debate', 'question'] as RecordType[]).map((recordType) => (
+                            <label key={recordType} className="inline-flex items-center gap-1.5 text-xs text-[var(--dai-ink)]">
+                              <input type="checkbox" checked={researchSettings.recordTypes.includes(recordType)} onChange={(event) => setResearchSettings((settings) => ({ ...settings, recordTypes: event.target.checked ? [...settings.recordTypes, recordType] : settings.recordTypes.filter((type) => type !== recordType) }))} className="h-3.5 w-3.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+                              {recordType === 'bill' ? 'Bills' : recordType === 'debate' ? 'Debates' : 'Questions'}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-[var(--dai-slate)]">
                   <span className="inline-flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-600" />Responses are grounded in official parliamentary records.</span>
-                  <span className="font-medium text-[var(--dai-ink)]">Latest: {usage.lastTokens.toLocaleString()} tokens, ${usage.lastCost.toFixed(4)}</span>
-                  <span>Session total: {usage.requests} requests, {(usage.inputTokens + usage.outputTokens).toLocaleString()} tokens, ${usage.cost.toFixed(4)} estimated</span>
+                  {usage.requests > 0 && <>
+                    <span className="font-medium text-[var(--dai-ink)]">Latest: {usage.lastTokens.toLocaleString()} tokens, ${usage.lastCost.toFixed(4)}</span>
+                    <span>Session total: {usage.requests} requests, {(usage.inputTokens + usage.outputTokens).toLocaleString()} tokens, ${usage.cost.toFixed(4)} estimated</span>
+                  </>}
                 </div>
               </div>
             </form>
@@ -914,6 +1133,37 @@ export default function Enquire() {
           <div className="mb-4 border-b border-slate-200 pb-3">
             <h3 className="text-sm font-semibold text-[var(--dai-ink)]">Research Tools</h3>
             <p className="mt-0.5 text-xs text-[var(--dai-slate)]">Choose a goal or starter to begin your analysis.</p>
+          </div>
+
+          <div className="mb-4 border-b border-[var(--dai-border)] pb-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-[var(--dai-ink)]">Research Skills</h4>
+              <button type="button" onClick={() => setSkillEditor({ name: '', description: '', instructions: '' })} className="inline-flex items-center gap-1 rounded-md border border-[var(--dai-border)] px-2 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50">
+                <Plus size={13} /> New skill
+              </button>
+            </div>
+            <select value={selectedSkillId ?? ''} onChange={(event) => openSkillDetails(event.target.value)} className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2.5 py-2 text-xs text-[var(--dai-ink)]">
+              <option value="">General research</option>
+              <optgroup label="Built-in skills">
+                {BUILT_IN_SKILLS.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
+              </optgroup>
+              {userSkills.length > 0 && <optgroup label="My skills">
+                {userSkills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
+              </optgroup>}
+            </select>
+            {skillEditor && (
+              <div className="mt-3 space-y-2 rounded-md border border-[var(--dai-border)] bg-[var(--dai-muted)] p-3">
+                <input readOnly={skillEditor.isBuiltIn} value={skillEditor.name} onChange={(event) => setSkillEditor({ ...skillEditor, name: event.target.value })} placeholder="Skill name" className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-xs text-[var(--dai-ink)] read-only:bg-slate-100" />
+                <input readOnly={skillEditor.isBuiltIn} value={skillEditor.description} onChange={(event) => setSkillEditor({ ...skillEditor, description: event.target.value })} placeholder="What this skill helps investigate" className="w-full rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-xs text-[var(--dai-ink)] read-only:bg-slate-100" />
+                <textarea readOnly={skillEditor.isBuiltIn} value={skillEditor.instructions} onChange={(event) => setSkillEditor({ ...skillEditor, instructions: event.target.value })} placeholder="Describe the evidence-based workflow to apply" rows={4} className="w-full resize-none rounded-md border border-[var(--dai-border)] bg-white px-2 py-1.5 text-xs leading-relaxed text-[var(--dai-ink)] read-only:bg-slate-100" />
+                <p className="text-[11px] leading-relaxed text-[var(--dai-slate)]">Skills guide analysis. Official parliamentary records remain the source of evidence.</p>
+                <div className="flex justify-end gap-2">
+                  {!skillEditor.isBuiltIn && skillEditor.id && <button type="button" onClick={() => { deleteSkill(skillEditor.id!); setSkillEditor(null); }} className="mr-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-white"><Trash2 size={12} />Delete</button>}
+                  <button type="button" onClick={() => setSkillEditor(null)} className="rounded-md px-2 py-1 text-xs text-[var(--dai-slate)] hover:bg-white">Close</button>
+                  {!skillEditor.isBuiltIn && <button type="button" onClick={saveSkill} disabled={!skillEditor.name.trim() || !skillEditor.instructions.trim()} className="inline-flex items-center gap-1 rounded-md bg-[var(--color-teal-600)] px-2 py-1 text-xs font-medium text-white hover:bg-[var(--color-teal-500)] disabled:opacity-50"><Pencil size={12} />Save skill</button>}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
@@ -1037,6 +1287,29 @@ export default function Enquire() {
           onClose={() => setShowPromptLibrary(false)}
           onSelectPrompt={(prompt: string, promptId: string) => handlePromptSelect(prompt, promptId)}
         />
+      )}
+
+      {savePromptDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="save-prompt-title" className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div><h3 id="save-prompt-title" className="text-base font-semibold text-[var(--dai-ink)]">Save research prompt</h3><p className="mt-1 text-xs text-[var(--dai-slate)]">Save this prompt to your library for reuse.</p></div>
+              <Bookmark className="h-5 w-5 text-teal-700" />
+            </div>
+            <label className="block text-xs font-medium text-[var(--dai-slate)]">Name
+              <input value={promptTitle} onChange={(event) => setPromptTitle(event.target.value)} className="mt-1 w-full rounded-md border border-[var(--dai-border)] px-3 py-2 text-sm text-[var(--dai-ink)]" />
+            </label>
+            <p className="mt-3 rounded-md bg-[var(--dai-muted)] p-3 text-xs leading-relaxed text-[var(--dai-slate)]">{inputValue}</p>
+            <label className="mt-4 flex items-start gap-2 text-sm text-[var(--dai-ink)]">
+              <input type="checkbox" checked={sharePrompt} onChange={(event) => setSharePrompt(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+              <span><span className="inline-flex items-center gap-1 font-medium"><Share2 size={13} /> Share with all users</span><span className="mt-1 block text-xs text-[var(--dai-slate)]">Shared prompts appear in the public Research Library.</span></span>
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setSavePromptDialog(false)} disabled={savingPrompt} className="rounded-md border border-[var(--dai-border)] px-3 py-2 text-sm text-[var(--dai-slate)] hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={savePrompt} disabled={savingPrompt || !promptTitle.trim()} className="rounded-md bg-[var(--color-teal-600)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--color-teal-500)] disabled:opacity-50">{savingPrompt ? 'Saving...' : 'Save prompt'}</button>
+            </div>
+          </section>
+        </div>
       )}
 
       {sourceDialog && (

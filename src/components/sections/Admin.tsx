@@ -3,7 +3,8 @@ import { auth } from '../../config/firebase';
 import {
   Users, Inbox, BarChart2, Settings2, CheckCircle2,
   XCircle, UserPlus, Trash2, ShieldOff, ShieldCheck,
-  LogOut, RefreshCw, ChevronDown, ChevronUp,
+  LogOut, RefreshCw, ChevronDown, ChevronUp, CircleDollarSign,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { API_URL } from '@/config/runtime';
@@ -30,9 +31,12 @@ interface AccessRequest { id: string; email: string; requestedAt: any; status: s
 interface AdminUser {
   uid: string; email: string; displayName: string; disabled: boolean;
   isAdmin: boolean; createdAt: string; lastSignIn: string;
+  dailyQueryLimit: number; dailyTokenLimit: number;
 }
 interface UsageRow { uid: string; email?: string; queries: number; tokensIn: number; tokensOut: number; cost: number }
 interface FeatureFlags { [key: string]: boolean }
+interface ServiceCosts { day: number; week: number; month: number; currency: string; source: string; updatedAt: string }
+interface FeedbackRow { id: string; executionId?: string; sentiment?: 'up' | 'down'; category?: string; comment?: string; query?: string; timestamp?: { seconds?: number }; source: 'structured' | 'chat' }
 
 // ── sub-components ─────────────────────────────────────────────────────────────
 
@@ -104,7 +108,6 @@ function RequestsTab() {
   const past    = rows.filter(r => r.status !== 'pending');
 
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>;
-  const adminCount = users.filter((user) => user.isAdmin).length;
 
   return (
     <div className="space-y-6">
@@ -178,6 +181,7 @@ function UsersTab() {
   const [creating, setCreating] = useState(false);
   const [inviteLink, setInviteLink] = useState<{ email: string; signInLink?: string; emailSent: boolean; emailError?: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [savingLimitFor, setSavingLimitFor] = useState<string | null>(null);
 
   const [fetchError, setFetchError] = useState('');
   const load = useCallback(async () => {
@@ -214,7 +218,22 @@ function UsersTab() {
     }
   };
 
+  const saveUsageLimit = async (user: AdminUser, dailyQueryLimit: number, dailyTokenLimit: number) => {
+    setSavingLimitFor(user.uid);
+    try {
+      const response = await adminFetch(`/api/admin/users/${user.uid}/usage-limit`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dailyQueryLimit, dailyTokenLimit }),
+      });
+      if (response.ok) await load();
+      else setFetchError(`Could not save limits for ${user.email}.`);
+    } finally {
+      setSavingLimitFor(null);
+    }
+  };
+
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>;
+  const adminCount = users.filter((user) => user.isAdmin).length;
 
   return (
     <div className="space-y-6">
@@ -245,7 +264,7 @@ function UsersTab() {
       <p className="text-xs text-slate-400 mb-3">Shows Firebase Authentication accounts only. Google Workspace users appear here after their first sign-in to Democratic AI.</p>
       <table className="w-full text-sm">
         <thead><tr className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b">
-          <th className="pb-2 pr-3">Email</th><th className="pb-2 pr-3">Created</th><th className="pb-2 pr-3">Last sign-in</th><th className="pb-2 pr-3">Status</th><th className="pb-2">Actions</th>
+          <th className="pb-2 pr-3">Email</th><th className="pb-2 pr-3">Created</th><th className="pb-2 pr-3">Last sign-in</th><th className="pb-2 pr-3">Daily limits</th><th className="pb-2 pr-3">Status</th><th className="pb-2">Actions</th>
         </tr></thead>
         <tbody>{users.map(u => {
           const isSoleAdmin = u.isAdmin && adminCount === 1;
@@ -258,6 +277,15 @@ function UsersTab() {
             </td>
             <td className="py-2.5 pr-3 text-xs text-slate-400">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
             <td className="py-2.5 pr-3 text-xs text-slate-400">{u.lastSignIn ? new Date(u.lastSignIn).toLocaleString() : 'Never'}</td>
+            <td className="py-2.5 pr-3">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <input type="number" min="1" defaultValue={u.dailyQueryLimit} aria-label={`Daily query limit for ${u.email}`} className="w-14 rounded border border-slate-200 px-1.5 py-1 text-center" onBlur={(event) => saveUsageLimit(u, Number(event.target.value), u.dailyTokenLimit)} />
+                <span className="text-slate-400">queries</span>
+                <input type="number" min="1000" step="1000" defaultValue={u.dailyTokenLimit} aria-label={`Daily token limit for ${u.email}`} className="w-20 rounded border border-slate-200 px-1.5 py-1 text-center" onBlur={(event) => saveUsageLimit(u, u.dailyQueryLimit, Number(event.target.value))} />
+                <span className="text-slate-400">tokens</span>
+                {savingLimitFor === u.uid && <span className="text-teal-600">Saving</span>}
+              </div>
+            </td>
             <td className="py-2.5 pr-3"><Badge label={u.disabled ? 'Suspended' : 'Active'} color={u.disabled ? 'amber' : 'green'} /></td>
             <td className="py-2.5">
               <div className="flex flex-wrap gap-1">
@@ -292,27 +320,19 @@ function UsersTab() {
 
 function UsageTab() {
   const [usage, setUsage] = useState<UsageRow[]>([]);
-  const [limit, setLimit] = useState(50);
-  const [limitInput, setLimitInput] = useState('50');
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const [ur, lr] = await Promise.all([adminFetch('/api/admin/usage'), adminFetch('/api/admin/token-limit')]);
+        const ur = await adminFetch('/api/admin/usage');
         if (ur.ok) {
           const data = await ur.json();
           const rows: UsageRow[] = Object.entries(data).map(([uid, v]: [string, any]) => ({ uid, ...v }));
           setUsage(rows.sort((a, b) => b.cost - a.cost));
         } else {
           setError(`Could not load usage data (HTTP ${ur.status}).`);
-        }
-        if (lr.ok) {
-          const d = await lr.json();
-          setLimit(d.dailyQueryLimit);
-          setLimitInput(String(d.dailyQueryLimit));
         }
       } catch {
         setError('Could not reach the admin usage API.');
@@ -321,27 +341,12 @@ function UsageTab() {
     })();
   }, []);
 
-  const saveLimit = async () => {
-    setSaving(true);
-    await adminFetch('/api/admin/token-limit', { method: 'PATCH', body: JSON.stringify({ dailyQueryLimit: Number(limitInput) }) });
-    setLimit(Number(limitInput));
-    setSaving(false);
-  };
-
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>;
 
   const totalCost = usage.reduce((s, r) => s + r.cost, 0);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-        <span className="text-sm font-medium text-slate-700">Daily query limit per user</span>
-        <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min="1" max="500"
-          className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
-        <Btn onClick={saveLimit} disabled={saving || Number(limitInput) === limit}>{saving ? 'Saving…' : 'Save'}</Btn>
-        <span className="text-xs text-slate-400 ml-2">Current: {limit} queries/day</span>
-      </div>
-
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-slate-700">Token usage (all time)</h3>
@@ -364,6 +369,74 @@ function UsageTab() {
       </div>
     </div>
   );
+}
+
+// ── Service costs tab ─────────────────────────────────────────────────────────
+
+function ServiceCostsTab() {
+  const [costs, setCosts] = useState<ServiceCosts | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    adminFetch('/api/admin/service-costs').then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) setCosts(data as ServiceCosts);
+      else setError(data.error || `Could not load service costs (HTTP ${response.status}).`);
+    }).catch(() => setError('Could not reach the service cost API.'));
+  }, []);
+
+  if (error) return <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-medium">Service costs unavailable</p><p className="mt-1 text-xs">{error}</p><p className="mt-2 text-xs">Enable Cloud Billing export to BigQuery, then set `GCP_BILLING_EXPORT_TABLE` on the API service.</p></div>;
+  if (!costs) return <p className="text-sm text-slate-400">Loading service costs...</p>;
+
+  const periods = [
+    { label: 'Last 24 hours', value: costs.day },
+    { label: 'Last 7 days', value: costs.week },
+    { label: 'Last 30 days', value: costs.month },
+  ];
+  const money = new Intl.NumberFormat('en-IE', { style: 'currency', currency: costs.currency, maximumFractionDigits: 2 });
+
+  return <div className="space-y-5">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {periods.map((period) => <div key={period.label} className="rounded-lg border border-[var(--dai-border)] bg-white p-4">
+        <p className="text-xs font-medium text-[var(--dai-slate)]">{period.label}</p>
+        <p className="mt-2 text-2xl font-semibold text-[var(--dai-ink)]">{money.format(period.value)}</p>
+      </div>)}
+    </div>
+    <div className="border-t border-[var(--dai-border)] pt-3 text-xs text-[var(--dai-slate)]">
+      <p>Source: {costs.source}. Includes billed GCP service usage and applied credits; it can lag behind real-time use.</p>
+      <p className="mt-1">Last queried: {new Date(costs.updatedAt).toLocaleString()}</p>
+    </div>
+  </div>;
+}
+
+// ── Feedback tab ──────────────────────────────────────────────────────────────
+
+function FeedbackTab() {
+  const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    adminFetch('/api/admin/feedback').then(async (response) => {
+      if (response.ok) setFeedback(await response.json());
+      else setError(`Could not load feedback (HTTP ${response.status}).`);
+    }).catch(() => setError('Could not reach the feedback API.'));
+  }, []);
+
+  if (error) return <p className="text-sm text-rose-600">{error}</p>;
+  if (feedback.length === 0) return <p className="text-sm text-slate-500">No feedback has been submitted yet.</p>;
+
+  return <div className="overflow-x-auto rounded-lg border border-[var(--dai-border)] bg-white">
+    <table className="w-full min-w-[760px] text-sm">
+      <thead className="border-b border-[var(--dai-border)] bg-[var(--dai-muted)] text-left text-xs font-semibold text-[var(--dai-slate)]"><tr><th className="px-3 py-2">Response</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Comment</th><th className="px-3 py-2">Query</th><th className="px-3 py-2">Submitted</th></tr></thead>
+      <tbody>{feedback.map((item) => <tr key={`${item.source}-${item.id}`} className="border-b border-slate-100 align-top last:border-0">
+        <td className="px-3 py-3"><Badge label={item.sentiment === 'up' ? 'Helpful' : item.sentiment === 'down' ? 'Not helpful' : 'Feedback'} color={item.sentiment === 'up' ? 'green' : item.sentiment === 'down' ? 'red' : 'slate'} /></td>
+        <td className="max-w-40 px-3 py-3 text-xs text-[var(--dai-slate)]">{item.category || '—'}</td>
+        <td className="max-w-xs px-3 py-3 text-xs leading-relaxed text-[var(--dai-ink)]">{item.comment || '—'}</td>
+        <td className="max-w-xs px-3 py-3 text-xs leading-relaxed text-[var(--dai-slate)]">{item.query || 'Not retained'}</td>
+        <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--dai-slate)]">{item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString() : '—'}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>;
 }
 
 // ── Features tab ───────────────────────────────────────────────────────────────
@@ -527,6 +600,8 @@ export default function Admin() {
     { id: 'requests', label: 'Access Requests', icon: Inbox, badge: pendingCount },
     { id: 'users',    label: 'Users',            icon: Users },
     { id: 'usage',    label: 'Usage',             icon: BarChart2 },
+    { id: 'feedback', label: 'Feedback',          icon: MessageSquare },
+    { id: 'service-costs', label: 'Service Costs', icon: CircleDollarSign },
     { id: 'features', label: 'Features',          icon: Settings2 },
   ];
 
@@ -547,6 +622,8 @@ export default function Admin() {
       {tab === 'requests' && <RequestsTab />}
       {tab === 'users'    && <UsersTab />}
       {tab === 'usage'    && <UsageTab />}
+      {tab === 'feedback' && <FeedbackTab />}
+      {tab === 'service-costs' && <ServiceCostsTab />}
       {tab === 'features' && <FeaturesTab />}
     </div>
   );

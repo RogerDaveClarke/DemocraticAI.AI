@@ -6,7 +6,7 @@
 import express, { Request, Response } from 'express';
 import NodeCache from 'node-cache';
 import { VertexAI } from '@google-cloud/vertexai';
-import { Firestore } from '@google-cloud/firestore';
+import { FieldValue, Firestore } from '@google-cloud/firestore';
 import { BigQuery } from '@google-cloud/bigquery';
 import { initializeApp as adminInitApp, getApps as adminGetApps } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
@@ -45,6 +45,11 @@ interface ChatRequest {
   sessionId: string;
   promptId?: string;
   filters?: any;
+  generationSettings?: {
+    maxOutputTokens?: number;
+    temperature?: number;
+  };
+  savedPromptId?: string;
 }
 
 interface ChatResponse {
@@ -62,6 +67,7 @@ interface ChatResponse {
 interface PromptExecution {
   id: string;
   promptId?: string;
+  savedPromptId?: string;
   sessionId: string;
   userId?: string;
   query: string;
@@ -88,6 +94,8 @@ interface PromptExecution {
 
 const BQ_PROJECT = process.env.GOOGLE_CLOUD_PROJECT!;
 const BQ_DATASET = process.env.BQ_DATASET || 'parliamentary_data';
+const DEFAULT_DAILY_QUERY_LIMIT = 50;
+const DEFAULT_DAILY_TOKEN_LIMIT = 100000;
 const PARLIAMENT_DATA_SOURCE = process.env.PARLIAMENT_DATA_SOURCE || 'Houses of the Oireachtas Open Data API';
 
 class ChatAPI {
@@ -182,6 +190,47 @@ class ChatAPI {
     return analysisModes[promptId] || 'General retrieval and answer mode';
   }
 
+  private async checkUsageLimits(userId: string, estimatedTokens: number): Promise<void> {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const [profile, dailyUsage] = await Promise.all([
+      this.db.collection('user_usage_limits').doc(userId).get(),
+      this.db.collection('daily_usage').doc(`${userId}_${dateKey}`).get(),
+    ]);
+    const limits = profile.data() || {};
+    const usage = dailyUsage.data() || {};
+    const queryLimit = limits.dailyQueryLimit ?? DEFAULT_DAILY_QUERY_LIMIT;
+    const tokenLimit = limits.dailyTokenLimit ?? DEFAULT_DAILY_TOKEN_LIMIT;
+    if ((usage.queries ?? 0) >= queryLimit) throw new Error('Daily query limit reached for this account.');
+    if ((usage.tokens ?? 0) + estimatedTokens > tokenLimit) throw new Error('Daily token limit reached for this account.');
+  }
+
+  private async recordDailyUsage(userId: string, tokens: number, cost: number): Promise<void> {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    await this.db.collection('daily_usage').doc(`${userId}_${dateKey}`).set({
+      userId,
+      dateKey,
+      queries: FieldValue.increment(1),
+      tokens: FieldValue.increment(tokens),
+      cost: FieldValue.increment(cost),
+      updatedAt: new Date(),
+    }, { merge: true });
+  }
+
+  async getPrivacySettings(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    if (!userId) { res.status(401).json({ error: 'Unauthorised' }); return; }
+    const profile = await this.db.collection('user_privacy_settings').doc(userId).get();
+    res.json({ exists: profile.exists, promptRetentionOptOut: profile.data()?.promptRetentionOptOut === true });
+  }
+
+  async setPrivacySettings(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const { promptRetentionOptOut } = req.body as { promptRetentionOptOut?: boolean };
+    if (!userId || typeof promptRetentionOptOut !== 'boolean') { res.status(400).json({ error: 'A privacy preference is required.' }); return; }
+    await this.db.collection('user_privacy_settings').doc(userId).set({ promptRetentionOptOut, updatedAt: new Date() }, { merge: true });
+    res.json({ promptRetentionOptOut });
+  }
+
   /**
    * Main chat endpoint
    */
@@ -198,7 +247,9 @@ class ChatAPI {
         prompt,
         sessionId,
         promptId,
-        filters
+        filters,
+        generationSettings,
+        savedPromptId
       }: ChatRequest = req.body;
 
       // Input validation
@@ -233,12 +284,25 @@ class ChatAPI {
         return;
       }
 
+      const userId = (req as Request & { uid?: string }).uid;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorised' });
+        return;
+      }
+      const estimatedTokens = this.estimateTokens(`${prompt}\n${JSON.stringify(context)}\n${sanitizedQuery}`) + (generationSettings?.maxOutputTokens ?? 2048);
+      await this.checkUsageLimits(userId, estimatedTokens);
+      const privacyProfile = await this.db.collection('user_privacy_settings').doc(userId).get();
+      const promptRetentionOptOut = privacyProfile.exists
+        ? privacyProfile.data()?.promptRetentionOptOut === true
+        : true;
+
       // Create execution record
       execution = {
         id: this.generateExecutionId(),
         sessionId,
-        userId: (req as Request & { uid?: string }).uid,
-        query: sanitizedQuery,
+        userId,
+        savedPromptId,
+        query: promptRetentionOptOut ? '[Prompt retention disabled by user]' : sanitizedQuery,
         originalLanguage: this.detectLanguage(sanitizedQuery),
         targetLanguage: userLanguage,
         modelUsed: model,
@@ -251,22 +315,23 @@ class ChatAPI {
         status: 'running',
         filters
       };
+      const activeExecution = execution;
 
       // Log execution start
-      await this.logExecution(execution);
+      await this.logExecution(activeExecution);
 
       // Route to appropriate model
       let response: ChatResponse;
       
       switch (model) {
         case 'gemini-flash':
-          response = await this.executeWithGeminiFlash(prompt, query, context, promptId);
+          response = await this.executeWithGeminiFlash(prompt, query, context, promptId, generationSettings);
           break;
         case 'gpt-4o-mini':
           response = await this.executeWithGPT4oMini(prompt, query, context, promptId);
           break;
         case 'gemini-pro':
-          response = await this.executeWithGeminiPro(prompt, query, context, promptId);
+          response = await this.executeWithGeminiPro(prompt, query, context, promptId, generationSettings);
           break;
         default:
           throw new Error(`Unsupported model: ${model}`);
@@ -274,24 +339,25 @@ class ChatAPI {
 
       // Update execution record
       const endTime = Date.now();
-      execution.endTime = new Date();
-      execution.processingTimeMs = endTime - startTime;
-      execution.tokensInput = response.tokensInput;
-      execution.tokensOutput = response.tokensOutput;
-      execution.cost = this.calculateCost(model, response.tokensInput, response.tokensOutput);
-      execution.confidence = response.confidence;
-      execution.response = response.text;
-      execution.status = 'completed';
+      activeExecution.endTime = new Date();
+      activeExecution.processingTimeMs = endTime - startTime;
+      activeExecution.tokensInput = response.tokensInput;
+      activeExecution.tokensOutput = response.tokensOutput;
+      activeExecution.cost = this.calculateCost(model, response.tokensInput, response.tokensOutput);
+      activeExecution.confidence = response.confidence;
+      activeExecution.response = response.text;
+      activeExecution.status = 'completed';
 
       // Log completed execution
-      await this.logExecution(execution);
-      await this.logModelPerformance(model, execution);
+      await this.logExecution(activeExecution);
+      await this.logModelPerformance(model, activeExecution);
+      await this.recordDailyUsage(userId, activeExecution.tokensInput + activeExecution.tokensOutput, activeExecution.cost);
 
       res.json({
         ...response,
-        executionId: execution.id,
-        cost: execution.cost,
-        processingTime: execution.processingTimeMs,
+        executionId: activeExecution.id,
+        cost: activeExecution.cost,
+        processingTime: activeExecution.processingTimeMs,
         promptId,
         analysisMode: this.getAnalysisMode(promptId)
       });
@@ -330,12 +396,13 @@ class ChatAPI {
     prompt: string,
     query: string,
     context: any[],
-    _promptId?: string
+    _promptId?: string,
+    generationSettings?: ChatRequest['generationSettings']
   ): Promise<ChatResponse> {
     try {
       const generationConfig = {
-        maxOutputTokens: 2048,
-        temperature: 0.1,
+        maxOutputTokens: Math.min(4096, Math.max(256, generationSettings?.maxOutputTokens ?? 2048)),
+        temperature: Math.min(0.3, Math.max(0, generationSettings?.temperature ?? 0.1)),
         topP: 0.8,
       };
       const fullPrompt = `${prompt}\n\nContext: ${JSON.stringify(context)}\n\nQuery: ${query}`;
@@ -382,12 +449,13 @@ class ChatAPI {
     prompt: string,
     query: string,
     context: any[],
-    _promptId?: string
+    _promptId?: string,
+    generationSettings?: ChatRequest['generationSettings']
   ): Promise<ChatResponse> {
     try {
       const generationConfig = {
-        maxOutputTokens: 4096,
-        temperature: 0.1,
+        maxOutputTokens: Math.min(4096, Math.max(256, generationSettings?.maxOutputTokens ?? 4096)),
+        temperature: Math.min(0.3, Math.max(0, generationSettings?.temperature ?? 0.1)),
         topP: 0.8,
       };
       const fullPrompt = `${prompt}\n\nContext: ${JSON.stringify(context)}\n\nQuery: ${query}`;
@@ -445,6 +513,53 @@ class ChatAPI {
       console.error('Failed to record feedback:', error);
       res.status(500).json({ error: 'Failed to record feedback' });
     }
+  }
+
+  async createSavedPrompt(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const { text, title, description, shared } = req.body as { text?: string; title?: string; description?: string; shared?: boolean };
+    if (!userId || !text?.trim()) { res.status(400).json({ error: 'A prompt is required.' }); return; }
+    const owner = await getAdminAuth().getUser(userId);
+    const document = await this.db.collection('saved_prompts').add({
+      ownerId: userId,
+      ownerEmail: owner.email ?? '',
+      text: text.trim().slice(0, 2000),
+      title: (title?.trim() || text.trim().slice(0, 80)).slice(0, 100),
+      description: (description?.trim() || '').slice(0, 240),
+      shared: shared === true,
+      ratingTotal: 0,
+      ratingCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    res.status(201).json({ id: document.id });
+  }
+
+  async listSavedPrompts(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    if (!userId) { res.status(401).json({ error: 'Unauthorised' }); return; }
+    const scope = req.query.scope === 'shared' ? 'shared' : 'mine';
+    const query = scope === 'shared'
+      ? this.db.collection('saved_prompts').where('shared', '==', true)
+      : this.db.collection('saved_prompts').where('ownerId', '==', userId);
+    const snapshot = await query.limit(100).get();
+    res.json(snapshot.docs.map((document) => ({ id: document.id, ...document.data() })));
+  }
+
+  async rateSavedPrompt(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const { rating, executionId } = req.body as { rating?: number; executionId?: string };
+    if (!userId || !executionId || (rating !== 1 && rating !== -1)) { res.status(400).json({ error: 'A valid rating and execution are required.' }); return; }
+    const promptRef = this.db.collection('saved_prompts').doc(req.params.id);
+    const voteRef = promptRef.collection('votes').doc(`${userId}_${executionId}`);
+    await this.db.runTransaction(async (transaction) => {
+      const [prompt, vote] = await Promise.all([transaction.get(promptRef), transaction.get(voteRef)]);
+      if (!prompt.exists) throw new Error('Prompt not found.');
+      if (vote.exists) throw new Error('This response has already been rated.');
+      transaction.set(voteRef, { userId, executionId, rating, createdAt: new Date() });
+      transaction.update(promptRef, { ratingTotal: FieldValue.increment(rating), ratingCount: FieldValue.increment(1), updatedAt: new Date() });
+    });
+    res.json({ success: true });
   }
 
   async recordAccessRequest(req: Request, res: Response): Promise<void> {
@@ -977,4 +1092,9 @@ export function setupChatRoutes(app: express.Application): void {
   app.get('/api/data-status',         (req, res) => chatAPI.getDataStatus(req, res));
   app.post('/api/access-requests',     (req, res) => chatAPI.recordAccessRequest(req, res));
   app.delete('/api/chat/history', requireAuth, (req, res) => chatAPI.deleteChatHistory(req, res));
+  app.get('/api/user/privacy', requireAuth, (req, res) => chatAPI.getPrivacySettings(req, res));
+  app.patch('/api/user/privacy', requireAuth, (req, res) => chatAPI.setPrivacySettings(req, res));
+  app.post('/api/prompts', requireAuth, (req, res) => chatAPI.createSavedPrompt(req, res));
+  app.get('/api/prompts', requireAuth, (req, res) => chatAPI.listSavedPrompts(req, res));
+  app.post('/api/prompts/:id/rating', requireAuth, (req, res) => chatAPI.rateSavedPrompt(req, res));
 }

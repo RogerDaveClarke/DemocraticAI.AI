@@ -150,14 +150,14 @@ const flow = ['Official Data', 'Processed Data', 'Indexed Knowledge', 'Relevant 
 
 export default function Architecture() {
   return (
-    <PageShell>
-      <div className="grid grid-cols-1 gap-6 px-8 py-6 xl:grid-cols-[1fr_280px]">
+    <PageShell contentClassName="max-w-none">
+      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-6 sm:py-6 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)] xl:gap-6">
           <main className="min-w-0 space-y-6">
             <section className="rounded-2xl border border-[var(--dai-border)] bg-white p-6 shadow-sm">
-              <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,26rem)]">
                 <div>
-                  <h1 className="text-5xl font-bold tracking-tight text-[var(--dai-ink)]">System Architecture</h1>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--color-teal-600)]">
+                  <h1 className="text-3xl font-bold text-[var(--dai-ink)] sm:text-4xl">System Architecture</h1>
+                  <p className="mt-2 text-xl font-semibold text-[var(--color-teal-600)] sm:text-2xl">
                     Built for transparency, accuracy, and democratic accountability
                   </p>
                   <p className="mt-4 max-w-3xl text-lg leading-8 text-[var(--dai-slate)]">
@@ -186,28 +186,28 @@ export default function Architecture() {
             </section>
 
             <section className="rounded-2xl border border-[var(--dai-border)] bg-white p-4 shadow-sm">
-              <div className="overflow-x-auto">
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] xl:min-w-[900px]">
+              <div>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
                 {stages.map((stage, index) => {
                   const Icon = stage.icon;
                   return (
                     <div key={stage.title} className="contents">
-                      <article className="rounded-xl border border-[var(--dai-border)] bg-gradient-to-b from-white to-slate-50 p-4 min-h-[325px]">
+                      <article className="min-w-0 rounded-xl border border-[var(--dai-border)] bg-gradient-to-b from-white to-slate-50 p-3 xl:min-h-[325px]">
                         <div className="inline-flex items-center gap-2">
                           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--dai-muted)] text-xs font-bold text-[var(--dai-slate)]">
                             {stage.step}
                           </span>
-                          <h3 className="text-lg font-semibold text-[var(--dai-ink)] leading-6">{stage.title}</h3>
+                          <h3 className="break-words text-sm font-semibold leading-5 text-[var(--dai-ink)]">{stage.title}</h3>
                         </div>
                         <div className={`mt-3 inline-flex rounded-xl p-2 ${stage.iconTint}`}>
                           <Icon className="h-7 w-7" />
                         </div>
-                        <ul className="mt-3 space-y-1 text-sm text-[var(--dai-slate)]">
+                        <ul className="mt-3 space-y-1 text-xs text-[var(--dai-slate)]">
                           {stage.points.map((point) => (
                             <li key={point} className="flex gap-2"><span>•</span><span>{point}</span></li>
                           ))}
                         </ul>
-                        <div className={`mt-4 rounded-lg px-3 py-2 text-xs font-semibold ${stage.pillTint}`}>{stage.pill}</div>
+                        <div className={`mt-4 break-words rounded-lg px-2 py-2 text-xs font-semibold ${stage.pillTint}`}>{stage.pill}</div>
                       </article>
                       {index < stages.length - 1 && (
                         <div className="hidden items-center justify-center xl:flex">

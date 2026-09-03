@@ -13,11 +13,13 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Share2,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { PageShell } from '@/components/patterns/PageShell';
+import { apiGet } from '@/utils/api';
 
 type PromptCard = {
   title: string;
@@ -139,11 +141,22 @@ const popularPrompts = [
   ['Find key quotes from this debate', '854 uses'],
 ] as const;
 
-const tabs = ['Public Library', 'My Prompts', 'Saved Reports'] as const;
+type SavedPrompt = { id: string; title: string; description: string; text: string; ownerEmail: string; ratingTotal: number; ratingCount: number; shared: boolean };
+const tabs = ['Shared Prompts', 'My Prompts', 'Saved Reports'] as const;
 type Tab = (typeof tabs)[number];
 
 export default function AIInsights() {
-  const [activeTab, setActiveTab] = useState<Tab>('Public Library');
+  const [activeTab, setActiveTab] = useState<Tab>('Shared Prompts');
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const [promptError, setPromptError] = useState('');
+
+  useEffect(() => {
+    if (activeTab === 'Saved Reports') return;
+    const scope = activeTab === 'My Prompts' ? 'mine' : 'shared';
+    apiGet<SavedPrompt[]>(`/api/prompts?scope=${scope}`)
+      .then(setSavedPrompts)
+      .catch(() => setPromptError('Could not load saved prompts.'));
+  }, [activeTab]);
 
   return (
     <PageShell>
@@ -233,34 +246,27 @@ export default function AIInsights() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {promptCards.map((card) => {
-                  const Icon = card.icon;
+              {activeTab === 'Saved Reports' ? <p className="rounded-xl border border-[var(--dai-border)] bg-white p-5 text-sm text-[var(--dai-slate)]">Saved reports will appear here.</p> : promptError ? <p className="text-sm text-rose-600">{promptError}</p> : savedPrompts.length === 0 ? <p className="rounded-xl border border-[var(--dai-border)] bg-white p-5 text-sm text-[var(--dai-slate)]">{activeTab === 'My Prompts' ? 'You have not saved any prompts yet.' : 'No prompts have been shared yet.'}</p> : <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {savedPrompts.map((card) => {
+                  const averageRating = card.ratingCount > 0 ? card.ratingTotal / card.ratingCount : 0;
                   return (
-                    <article key={card.title} className="min-h-[240px] rounded-2xl border border-[var(--dai-border)] bg-white p-5 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
+                    <article key={card.id} className="flex h-[210px] flex-col rounded-2xl border border-[var(--dai-border)] bg-white p-5 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
                       <div className="flex items-start justify-between gap-3">
-                        <div className={`inline-flex rounded-xl p-2 ${card.iconTint}`}>
-                          <Icon className="h-5 w-5" />
+                        <div className="inline-flex rounded-xl bg-teal-50 p-2 text-teal-700">
+                          <MessageSquare className="h-5 w-5" />
                         </div>
-                        <Bookmark className="h-4 w-4 text-[var(--dai-slate)]" />
+                        {card.shared && <Share2 className="h-4 w-4 text-teal-700" />}
                       </div>
-                      <h3 className="mt-4 text-lg font-semibold leading-7 text-[var(--dai-ink)]">{card.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-[var(--dai-slate)]">{card.description}</p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {card.tags.map((tag) => (
-                          <span key={tag} className="rounded-full bg-[var(--dai-muted)] px-2.5 py-1 text-xs font-medium text-[var(--dai-slate)]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-5 flex items-center justify-between border-t border-[var(--dai-border)] pt-3 text-xs text-[var(--dai-slate)]">
-                        <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 text-amber-500" /> {card.meta}</span>
-                        <span>{card.uses}</span>
+                      <h3 className="mt-4 line-clamp-2 text-lg font-semibold leading-6 text-[var(--dai-ink)]">{card.title}</h3>
+                      <p className="mt-2 line-clamp-2 text-sm leading-5 text-[var(--dai-slate)]">{card.description || card.text}</p>
+                      <div className="mt-auto flex items-center justify-between border-t border-[var(--dai-border)] pt-3 text-xs text-[var(--dai-slate)]">
+                        <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 text-amber-500" /> {averageRating.toFixed(1)} ({card.ratingCount})</span>
+                        <span>{card.shared ? card.ownerEmail : 'Saved by you'}</span>
                       </div>
                     </article>
                   );
                 })}
-              </div>
+              </div>}
 
               <div className="flex justify-center">
                 <button type="button" className="rounded-lg border border-[var(--dai-border)] bg-white px-5 py-2 text-sm font-semibold text-[var(--dai-slate)] shadow-sm hover:bg-[var(--dai-muted)]">
