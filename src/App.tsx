@@ -169,8 +169,7 @@ function App() {
 
   useEffect(() => {
     pageView(pathname);
-    const title = getSectionTitle(currentSection);
-    document.title = `${title} | Democratic AI`;
+    document.title = 'DemocraticAI';
   }, [pathname, currentSection]);
 
   useEffect(() => {
