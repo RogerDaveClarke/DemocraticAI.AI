@@ -51,6 +51,18 @@ const usageMonitor = APIUsageMonitor.getInstance();
 const app = express();
 const port = process.env.PORT || 8080;
 
+app.use((req, res, next) => {
+  const headerValue = req.header('X-Request-ID');
+  const requestId = headerValue && /^[A-Za-z0-9_-]{8,128}$/.test(headerValue)
+    ? headerValue
+    : `req_${crypto.randomUUID()}`;
+  (req as express.Request & { requestId?: string }).requestId = requestId;
+  res.setHeader('X-Request-ID', requestId);
+  const startedAt = Date.now();
+  res.on('finish', () => console.info(JSON.stringify({ severity: 'INFO', message: 'HTTP request completed', component: 'api', requestId, method: req.method, path: req.path, status: res.statusCode, latencyMs: Date.now() - startedAt })));
+  next();
+});
+
 // Trust Cloud Run load balancer so req.ip reflects the real client IP
 app.set('trust proxy', 1);
 

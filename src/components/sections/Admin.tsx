@@ -4,7 +4,7 @@ import {
   Users, Inbox, BarChart2, Settings2, CheckCircle2,
   XCircle, UserPlus, Trash2, ShieldOff, ShieldCheck,
   LogOut, RefreshCw, ChevronDown, ChevronUp, CircleDollarSign,
-  MessageSquare,
+  MessageSquare, ScanSearch,
   type LucideIcon,
 } from 'lucide-react';
 import { API_URL } from '@/config/runtime';
@@ -37,6 +37,7 @@ interface UsageRow { uid: string; email?: string; queries: number; tokensIn: num
 interface FeatureFlags { [key: string]: boolean }
 interface ServiceCosts { day: number; week: number; month: number; currency: string; source: string; updatedAt: string }
 interface FeedbackRow { id: string; executionId?: string; sentiment?: 'up' | 'down'; category?: string; comment?: string; query?: string; timestamp?: { seconds?: number }; source: 'structured' | 'chat' }
+interface TraceResult { requestId: string; message?: string; execution: { id: string; status: string; modelUsed: string; tokensInput: number; tokensOutput: number; cost: number; processingTimeMs?: number; retrievedDocuments: number; error?: string } | null }
 
 // ── sub-components ─────────────────────────────────────────────────────────────
 
@@ -439,6 +440,28 @@ function FeedbackTab() {
   </div>;
 }
 
+function ObservabilityTab() {
+  const [requestId, setRequestId] = useState('');
+  const [result, setResult] = useState<TraceResult | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const lookup = async () => {
+    if (!requestId.trim()) return;
+    setLoading(true); setError(''); setResult(null);
+    try {
+      const response = await adminFetch(`/api/admin/observability?requestId=${encodeURIComponent(requestId.trim())}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setResult(await response.json());
+    } catch (lookupError) { setError(lookupError instanceof Error ? `Could not retrieve trace (${lookupError.message}).` : 'Could not retrieve trace.'); }
+    finally { setLoading(false); }
+  };
+  return <div className="space-y-4">
+    <div className="flex max-w-xl gap-2"><input value={requestId} onChange={(event) => setRequestId(event.target.value)} placeholder="Paste Request ID from a UI error" className="min-w-0 flex-1 rounded-lg border border-[var(--dai-border)] px-3 py-2 text-sm" /><Btn onClick={lookup} disabled={!requestId.trim() || loading}>{loading ? 'Searching...' : 'Trace request'}</Btn></div>
+    {error && <p className="text-sm text-rose-600">{error}</p>}
+    {result && (result.execution ? <div className="rounded-lg border border-[var(--dai-border)] bg-white p-4 text-sm"><p className="font-semibold text-[var(--dai-ink)]">Execution {result.execution.id}</p><dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[var(--dai-slate)]"><dt>Status</dt><dd>{result.execution.status}</dd><dt>Model</dt><dd>{result.execution.modelUsed}</dd><dt>Tokens</dt><dd>{result.execution.tokensInput + result.execution.tokensOutput}</dd><dt>Estimated cost</dt><dd>${result.execution.cost.toFixed(4)}</dd><dt>Latency</dt><dd>{result.execution.processingTimeMs ?? 0}ms</dd><dt>Retrieved records</dt><dd>{result.execution.retrievedDocuments}</dd>{result.execution.error && <><dt>Error</dt><dd className="text-rose-600">{result.execution.error}</dd></>}</dl></div> : <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-[var(--dai-slate)]">{result.message}</p>)}
+  </div>;
+}
+
 // ── Features tab ───────────────────────────────────────────────────────────────
 
 const FLAG_LABELS: Record<string, string> = {
@@ -601,6 +624,7 @@ export default function Admin() {
     { id: 'users',    label: 'Users',            icon: Users },
     { id: 'usage',    label: 'Usage',             icon: BarChart2 },
     { id: 'feedback', label: 'Feedback',          icon: MessageSquare },
+    { id: 'observability', label: 'Observability', icon: ScanSearch },
     { id: 'service-costs', label: 'Service Costs', icon: CircleDollarSign },
     { id: 'features', label: 'Features',          icon: Settings2 },
   ];
@@ -623,6 +647,7 @@ export default function Admin() {
       {tab === 'users'    && <UsersTab />}
       {tab === 'usage'    && <UsageTab />}
       {tab === 'feedback' && <FeedbackTab />}
+      {tab === 'observability' && <ObservabilityTab />}
       {tab === 'service-costs' && <ServiceCostsTab />}
       {tab === 'features' && <FeaturesTab />}
     </div>

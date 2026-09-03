@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { track } from '@/utils/analytics';
-import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search, Settings2, X, Plus, Pencil, Trash2, Bookmark, Share2 } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Lightbulb, Copy, ShieldCheck, ChevronRight, MessageSquare, Search, Settings2, X, Plus, Pencil, Trash2, Bookmark, Share2, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PromptLibrary from '../PromptLibrary';
 import { useLoadingAnnouncer } from '../../hooks/accessibilityHooks';
@@ -9,6 +9,7 @@ import { apiPost } from '../../utils/api';
 import { promptLibrary } from '../../data/promptLibrary';
 import { PageShell } from '@/components/patterns';
 import { API_URL } from '@/config/runtime';
+import { toPublicOfficialSourceUrl } from '@/utils/officialSources';
 
 interface Message {
   id: string;
@@ -24,6 +25,8 @@ interface Message {
     cost: number;
     processingTime: number;
     confidence: number;
+    tokensInput?: number;
+    tokensOutput?: number;
     tokensUsed: number;
     retrievedDocuments: number;
     analysisMode?: string;
@@ -64,6 +67,17 @@ interface SearchDocument {
   uri?: string;
   relevance?: number;
 }
+
+type PromptScope = {
+  promptText: string;
+  promptId: string;
+  requiresMembers: number;
+  requiresDebate: boolean;
+  requiresBill: boolean;
+  requiresPeriod: boolean;
+};
+
+type ScopeOption = { id: string; label: string };
 
 type RecordType = SearchDocument['source'];
 type ResearchSettings = {
@@ -159,6 +173,17 @@ export default function Enquire() {
   const [promptTitle, setPromptTitle] = useState('');
   const [sharePrompt, setSharePrompt] = useState(false);
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [reportDialog, setReportDialog] = useState<Message | null>(null);
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportPublic, setReportPublic] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [reportSaveError, setReportSaveError] = useState('');
+  const [savedReportScope, setSavedReportScope] = useState<'mine' | 'all' | null>(null);
+  const [promptScope, setPromptScope] = useState<PromptScope | null>(null);
+  const [scopeMembers, setScopeMembers] = useState<ScopeOption[]>([]);
+  const [scopeRecords, setScopeRecords] = useState<SearchDocument[]>([]);
+  const [scopeValues, setScopeValues] = useState({ memberOne: '', memberTwo: '', debate: '', bill: '', period: '' });
+  const [scopeLoading, setScopeLoading] = useState(false);
   const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, cost: 0, requests: 0, lastTokens: 0, lastCost: 0 });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -529,6 +554,8 @@ export default function Enquire() {
           cost: apiResponse.cost,
           processingTime: apiResponse.processingTime,
           confidence: apiResponse.confidence,
+          tokensInput: apiResponse.tokensInput,
+          tokensOutput: apiResponse.tokensOutput,
           tokensUsed: apiResponse.tokensInput + apiResponse.tokensOutput,
           retrievedDocuments: context.length,
           analysisMode: apiResponse.analysisMode,
@@ -635,6 +662,30 @@ export default function Enquire() {
 
   const handlePromptSelect = (promptText: string, _promptId: string) => {
     setShowPromptLibrary(false);
+    const normalized = promptText.toLowerCase();
+    const scope: PromptScope = {
+      promptText,
+      promptId: _promptId,
+      requiresMembers: /two members|compare how .*members/.test(normalized) ? 2 : /this member|member's/.test(normalized) ? 1 : 0,
+      requiresDebate: /this debate|the debate/.test(normalized),
+      requiresBill: /this bill|this legislation|compare amendments|bill versions/.test(normalized),
+      requiresPeriod: /this year|last year|this month|last month|past \d+ years?|over the last \d+ years?/.test(normalized),
+    };
+    if (scope.requiresMembers || scope.requiresDebate || scope.requiresBill || scope.requiresPeriod) {
+      setPromptScope(scope);
+      setScopeValues({ memberOne: '', memberTwo: '', debate: '', bill: '', period: '' });
+      setScopeLoading(true);
+      Promise.all([
+        scope.requiresMembers ? apiGet<{ members?: Array<{ id?: string; memberId?: string; memberCode?: string; showAs?: string; fullName?: string; name?: string }> }>('/api/members?limit=100&active_only=true') : Promise.resolve({ members: [] }),
+        scope.requiresDebate ? apiPost<{ documents?: SearchDocument[] }>('/api/search', { query: 'debate', limit: 50 }) : Promise.resolve({ documents: [] }),
+        scope.requiresBill ? apiGet<{ documents?: SearchDocument[] }>('/api/reference/bills') : Promise.resolve({ documents: [] }),
+      ]).then(([memberResponse, debateResponse, billResponse]) => {
+        setScopeMembers((memberResponse.members || []).map((member) => ({ id: member.id || member.memberId || member.memberCode || member.showAs || '', label: member.showAs || member.fullName || member.name || 'Unnamed member' })).filter((member) => member.id));
+        const uniqueRecords = [...(debateResponse.documents || []), ...(billResponse.documents || [])].filter((record, index, records) => records.findIndex((candidate) => candidate.source === record.source && candidate.id === record.id) === index);
+        setScopeRecords(uniqueRecords);
+      }).catch((error) => console.error('Failed to load prompt scope options:', error)).finally(() => setScopeLoading(false));
+      return;
+    }
     setSelectedPromptId(_promptId);
     setInputValue(promptText);
     track('enquire', 'prompt-select', 'click', _promptId);
@@ -642,6 +693,23 @@ export default function Enquire() {
     setTimeout(() => {
       inputRef.current?.focus();
     }, 100);
+  };
+
+  const applyPromptScope = () => {
+    if (!promptScope) return;
+    const members = scopeMembers.filter((member) => [scopeValues.memberOne, scopeValues.memberTwo].includes(member.id)).map((member) => member.label);
+    const debate = scopeRecords.find((record) => record.id === scopeValues.debate)?.title;
+    const bill = scopeRecords.find((record) => record.id === scopeValues.bill)?.title;
+    const scopeLines = [
+      members.length ? `Members: ${members.join(' and ')}.` : '',
+      debate ? `Debate: ${debate}.` : '',
+      bill ? `Bill or legislation: ${bill}.` : '',
+      scopeValues.period ? `Period: ${scopeValues.period}.` : '',
+    ].filter(Boolean);
+    setSelectedPromptId(promptScope.promptId);
+    setInputValue(`${promptScope.promptText}\n\n${scopeLines.join(' ')}`);
+    setPromptScope(null);
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const applyResearchGoal = (goal: string) => {
@@ -708,6 +776,36 @@ export default function Enquire() {
       console.error('Failed to save prompt:', error);
     } finally {
       setSavingPrompt(false);
+    }
+  };
+
+  const saveReport = async () => {
+    if (!reportDialog?.executionId || !reportTitle.trim()) return;
+    setSavingReport(true);
+    setReportSaveError('');
+    try {
+      await apiPost('/api/reports', {
+        title: reportTitle,
+        content: reportDialog.text,
+        sources: reportDialog.sources || [],
+        executionId: reportDialog.executionId,
+        isPublic: reportPublic,
+        metrics: {
+          model: reportDialog.metadata?.modelUsed,
+          tokensInput: reportDialog.metadata?.tokensInput,
+          tokensOutput: reportDialog.metadata?.tokensOutput,
+          cost: reportDialog.metadata?.cost,
+        },
+      });
+      setReportDialog(null);
+      setReportTitle('');
+      setReportPublic(false);
+      setSavedReportScope(reportPublic ? 'all' : 'mine');
+    } catch (error) {
+      console.error('Failed to save report:', error);
+      setReportSaveError(error instanceof Error ? error.message : 'Could not save this report.');
+    } finally {
+      setSavingReport(false);
     }
   };
 
@@ -912,6 +1010,7 @@ export default function Enquire() {
                       <div className="mt-2">
                         <div className="flex flex-wrap items-center gap-1 border-t border-[var(--dai-border)] pt-2 text-xs">
                           <button onClick={() => copyToClipboard(message.text)} aria-label="Copy response" className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[var(--dai-slate)] hover:bg-slate-100"><Copy size={12} />Copy</button>
+                          {message.executionId && <button onClick={() => { setReportTitle('Research report'); setReportPublic(false); setReportDialog(message); }} aria-label="Save report" className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[var(--dai-slate)] hover:bg-slate-100"><FileText size={12} />Save report</button>}
                           {FEEDBACK_ENABLED && (() => {
                             const fs = feedbackStates[message.id];
                             const submitted = fs?.submitted ?? false;
@@ -1289,6 +1388,26 @@ export default function Enquire() {
         />
       )}
 
+      {promptScope && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="prompt-scope-title" className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div><h3 id="prompt-scope-title" className="text-base font-semibold text-[var(--dai-ink)]">Complete research scope</h3><p className="mt-1 text-xs leading-relaxed text-[var(--dai-slate)]">This prompt needs specific official records before it can run.</p></div>
+              <button type="button" onClick={() => setPromptScope(null)} aria-label="Cancel prompt scope" className="rounded-md p-1 text-[var(--dai-slate)] hover:bg-slate-100"><X size={18} /></button>
+            </div>
+            <p className="mb-4 rounded-md bg-[var(--dai-muted)] p-3 text-sm text-[var(--dai-ink)]">{promptScope.promptText}</p>
+            {scopeLoading ? <p className="text-sm text-[var(--dai-slate)]">Loading official records...</p> : <div className="space-y-3">
+              {promptScope.requiresMembers >= 1 && <label className="block text-xs font-medium text-[var(--dai-slate)]">{promptScope.requiresMembers === 2 ? 'First member' : 'Member'}<select value={scopeValues.memberOne} onChange={(event) => setScopeValues((values) => ({ ...values, memberOne: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a member</option>{scopeMembers.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
+              {promptScope.requiresMembers === 2 && <label className="block text-xs font-medium text-[var(--dai-slate)]">Second member<select value={scopeValues.memberTwo} onChange={(event) => setScopeValues((values) => ({ ...values, memberTwo: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a member</option>{scopeMembers.filter((member) => member.id !== scopeValues.memberOne).map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
+              {promptScope.requiresDebate && <label className="block text-xs font-medium text-[var(--dai-slate)]">Debate<select value={scopeValues.debate} onChange={(event) => setScopeValues((values) => ({ ...values, debate: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a debate</option>{scopeRecords.filter((record) => record.source === 'debate').map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}</select></label>}
+              {promptScope.requiresBill && <label className="block text-xs font-medium text-[var(--dai-slate)]">Bill or legislation<select value={scopeValues.bill} onChange={(event) => setScopeValues((values) => ({ ...values, bill: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a bill or legislation record</option>{scopeRecords.filter((record) => record.source === 'bill').map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}</select></label>}
+              {promptScope.requiresPeriod && <label className="block text-xs font-medium text-[var(--dai-slate)]">Time period<select value={scopeValues.period} onChange={(event) => setScopeValues((values) => ({ ...values, period: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a time period</option>{Array.from({ length: 6 }, (_, index) => new Date().getFullYear() - index).map((year) => <option key={year} value={String(year)}>{year}</option>)}<option value="Last month">Last month</option><option value="This month">This month</option></select></label>}
+            </div>}
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setPromptScope(null)} className="rounded-md border border-[var(--dai-border)] px-3 py-2 text-sm text-[var(--dai-slate)] hover:bg-slate-50">Cancel</button><button type="button" onClick={applyPromptScope} disabled={scopeLoading || (promptScope.requiresMembers >= 1 && (!scopeValues.memberOne || (promptScope.requiresMembers === 2 && !scopeValues.memberTwo))) || (promptScope.requiresDebate && !scopeValues.debate) || (promptScope.requiresBill && !scopeValues.bill) || (promptScope.requiresPeriod && !scopeValues.period)} className="rounded-md bg-[var(--color-teal-600)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--color-teal-500)] disabled:opacity-50">Use scoped prompt</button></div>
+          </section>
+        </div>
+      )}
+
       {savePromptDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
           <section role="dialog" aria-modal="true" aria-labelledby="save-prompt-title" className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
@@ -1312,6 +1431,20 @@ export default function Enquire() {
         </div>
       )}
 
+      {reportDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="save-report-title" className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h3 id="save-report-title" className="text-base font-semibold text-[var(--dai-ink)]">Save research report</h3><p className="mt-1 text-xs text-[var(--dai-slate)]">This saves the response Markdown, source links, date, and model usage metrics.</p></div><FileText className="h-5 w-5 text-teal-700" /></div>
+            <label className="block text-xs font-medium text-[var(--dai-slate)]">Report name<input value={reportTitle} onChange={(event) => setReportTitle(event.target.value)} className="mt-1 w-full rounded-md border border-[var(--dai-border)] px-3 py-2 text-sm text-[var(--dai-ink)]" /></label>
+            <label className="mt-4 flex items-start gap-2 text-sm text-[var(--dai-ink)]"><input type="checkbox" checked={reportPublic} onChange={(event) => setReportPublic(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" /><span><span className="inline-flex items-center gap-1 font-medium"><Share2 size={13} /> Make this report public</span><span className="mt-1 block text-xs text-[var(--dai-slate)]">Public reports appear in All Saved for signed-in users.</span></span></label>
+            {reportSaveError && <p className="mt-3 text-xs text-rose-600">{reportSaveError}</p>}
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setReportDialog(null)} disabled={savingReport} className="rounded-md border border-[var(--dai-border)] px-3 py-2 text-sm text-[var(--dai-slate)] hover:bg-slate-50">Cancel</button><button type="button" onClick={saveReport} disabled={savingReport || !reportTitle.trim()} className="rounded-md bg-[var(--color-teal-600)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--color-teal-500)] disabled:opacity-50">{savingReport ? 'Saving...' : 'Save report'}</button></div>
+          </section>
+        </div>
+      )}
+
+      {savedReportScope && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg border border-teal-200 bg-white px-4 py-3 text-sm text-[var(--dai-ink)] shadow-lg"><span>Report saved.</span><a href={`/saved-research?scope=${savedReportScope}`} className="font-medium text-teal-700 hover:underline">View report</a><button type="button" onClick={() => setSavedReportScope(null)} aria-label="Dismiss saved report confirmation" className="text-[var(--dai-slate)] hover:text-[var(--dai-ink)]"><X size={16} /></button></div>}
+
       {sourceDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={() => setSourceDialog(null)}>
           <section
@@ -1334,8 +1467,8 @@ export default function Enquire() {
               <ol className="space-y-3">
                 {sourceDialog.sources.map((source, index) => (
                   <li key={`${source.source}-${source.id}`} className="border-b border-slate-100 pb-3 last:border-0">
-                    {source.uri ? (
-                      <a href={source.uri} target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline decoration-teal-400 underline-offset-2 hover:text-teal-900">
+                    {toPublicOfficialSourceUrl(source.uri) ? (
+                      <a href={toPublicOfficialSourceUrl(source.uri)} target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline decoration-teal-400 underline-offset-2 hover:text-teal-900">
                         {index + 1}. {source.title}
                       </a>
                     ) : (

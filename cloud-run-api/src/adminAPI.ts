@@ -215,6 +215,26 @@ class AdminAPI {
     }
   }
 
+  async findTrace(req: Request, res: Response): Promise<void> {
+    const requestId = req.query.requestId;
+    if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(requestId)) {
+      res.status(400).json({ error: 'A valid request ID is required.' });
+      return;
+    }
+    try {
+      const snapshot = await db.collection('chat_executions').where('requestId', '==', requestId).limit(1).get();
+      if (snapshot.empty) {
+        res.json({ requestId, execution: null, message: 'No persisted chat execution matched this request ID. Check Cloud Run service logs for the API completion event.' });
+        return;
+      }
+      const execution = snapshot.docs[0];
+      res.json({ requestId, execution: { id: execution.id, ...execution.data() } });
+    } catch (error) {
+      console.error('Failed to find trace:', error);
+      res.status(500).json({ error: 'Could not retrieve the request trace.' });
+    }
+  }
+
   async getTokenLimit(_req: Request, res: Response): Promise<void> {
     try {
       const doc = await db.collection('platform_config').doc('defaults').get();
@@ -335,6 +355,7 @@ export function setupAdminRoutes(app: express.Application): void {
   app.post('/api/admin/users/:uid/revoke-tokens',  ...guard, (req, res) => api.revokeUserTokens(req, res));
   app.get('/api/admin/usage',                      ...guard, (req, res) => api.getUsage(req, res));
   app.get('/api/admin/feedback',                   ...guard, (req, res) => api.getFeedback(req, res));
+  app.get('/api/admin/observability',              ...guard, (req, res) => api.findTrace(req, res));
   app.patch('/api/admin/users/:uid/usage-limit',    ...guard, (req, res) => api.setUserUsageLimit(req, res));
   app.get('/api/admin/service-costs',                ...guard, (req, res) => api.getServiceCosts(req, res));
   app.get('/api/admin/token-limit',                ...guard, (req, res) => api.getTokenLimit(req, res));

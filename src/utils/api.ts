@@ -8,6 +8,12 @@ import { auth } from '@/config/firebase';
 const API_BASE_URL = import.meta.env.VITE_API_URL || API_URL;
 const API_KEY = import.meta.env.VITE_API_KEY; // Set this in production
 
+function createRequestId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * Makes an authenticated API request
  * @param endpoint - API endpoint path
@@ -19,6 +25,7 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
   
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
+  headers.set('X-Request-ID', createRequestId());
 
   const token = await auth.currentUser?.getIdToken(true);
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -39,18 +46,18 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
     // Handle rate limiting
     if (response.status === 429) {
       const retryAfter = response.headers.get('Retry-After') || '60';
-      throw new Error(`Rate limit exceeded. Please try again in ${retryAfter} seconds.`);
+      throw new Error(`Rate limit exceeded. Please try again in ${retryAfter} seconds. Request ID: ${response.headers.get('X-Request-ID') || 'unavailable'}`);
     }
     
     // Handle authentication errors
     if (response.status === 401) {
-      throw new Error('Authentication failed. Please sign in again.');
+      throw new Error(`Authentication failed. Please sign in again. Request ID: ${response.headers.get('X-Request-ID') || 'unavailable'}`);
     }
     
     // Handle other HTTP errors
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`${errorData.error || `HTTP ${response.status}: ${response.statusText}`} Request ID: ${response.headers.get('X-Request-ID') || 'unavailable'}`);
     }
     
     return response;

@@ -66,6 +66,7 @@ interface ChatResponse {
 
 interface PromptExecution {
   id: string;
+  requestId?: string;
   promptId?: string;
   savedPromptId?: string;
   sessionId: string;
@@ -96,6 +97,14 @@ const BQ_PROJECT = process.env.GOOGLE_CLOUD_PROJECT!;
 const BQ_DATASET = process.env.BQ_DATASET || 'parliamentary_data';
 const DEFAULT_DAILY_QUERY_LIMIT = 50;
 const DEFAULT_DAILY_TOKEN_LIMIT = 100000;
+
+function toPublicSourceUrl(uri: unknown): string | undefined {
+  if (typeof uri !== 'string' || !uri) return undefined;
+  const debateMatch = uri.match(/^https:\/\/data\.oireachtas\.ie\/akn\/ie\/debateRecord\/(dail|seanad)\/(\d{4}-\d{2}-\d{2})\/debate\/main$/i);
+  if (debateMatch) return `https://www.oireachtas.ie/en/debates/debate/${debateMatch[1].toLowerCase()}/${debateMatch[2]}/`;
+  const questionMatch = uri.match(/^https:\/\/data\.oireachtas\.ie\/ie\/oireachtas\/question\/(\d{4}-\d{2}-\d{2})\/pq_(\d+)$/i);
+  return questionMatch ? `https://www.oireachtas.ie/en/debates/question/${questionMatch[1]}/${questionMatch[2]}/` : uri;
+}
 const PARLIAMENT_DATA_SOURCE = process.env.PARLIAMENT_DATA_SOURCE || 'Houses of the Oireachtas Open Data API';
 
 class ChatAPI {
@@ -285,6 +294,7 @@ class ChatAPI {
       }
 
       const userId = (req as Request & { uid?: string }).uid;
+      const requestId = (req as Request & { requestId?: string }).requestId;
       if (!userId) {
         res.status(401).json({ error: 'Unauthorised' });
         return;
@@ -299,6 +309,7 @@ class ChatAPI {
       // Create execution record
       execution = {
         id: this.generateExecutionId(),
+        requestId,
         sessionId,
         userId,
         savedPromptId,
@@ -371,7 +382,7 @@ class ChatAPI {
         await this.logExecution(execution);
       }
 
-      console.error('Chat request failed:', error);
+      console.error(JSON.stringify({ severity: 'ERROR', message: 'Chat request failed', component: 'chat', requestId: (req as Request & { requestId?: string }).requestId, error: error instanceof Error ? error.message : String(error) }));
 
       if (this.isModelUnavailableError(error)) {
         res.status(503).json({
@@ -560,6 +571,145 @@ class ChatAPI {
       transaction.update(promptRef, { ratingTotal: FieldValue.increment(rating), ratingCount: FieldValue.increment(1), updatedAt: new Date() });
     });
     res.json({ success: true });
+  }
+
+  async createReport(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const { title, content, sources, executionId, isPublic, metrics } = req.body as { title?: string; content?: string; sources?: unknown[]; executionId?: string; isPublic?: boolean; metrics?: { model?: string; tokensInput?: number; tokensOutput?: number; cost?: number } };
+    if (!userId || !title?.trim() || !content?.trim() || !executionId) { res.status(400).json({ error: 'Title, report content, and execution are required.' }); return; }
+    const execution = await this.db.collection('chat_executions').doc(executionId).get();
+    const executionOwnerId = execution.data()?.userId as string | undefined;
+    if (executionOwnerId && executionOwnerId !== userId) { res.status(403).json({ error: 'You can only save your own research responses.' }); return; }
+    if (execution.exists && !executionOwnerId) {
+      await execution.ref.set({ userId }, { merge: true });
+    }
+    const owner = await getAdminAuth().getUser(userId);
+    const normalizedSources = Array.isArray(sources) ? sources.slice(0, 50) : [];
+    const sourceIds = new Set(normalizedSources.map((source: any) => `${source.source ?? ''}:${source.id ?? ''}`));
+    const relatedRecords = (await this.queryBigQueryContext(title.trim(), 20))
+      .filter((record) => !sourceIds.has(`${record.source}:${record.id}`))
+      .slice(0, 8);
+    const summary = content.replace(/\*\*[^*]+\*\*/g, '').replace(/[#*_`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 240);
+    const findings = content.split(/\n+/).filter((line) => /^[-*]\s+|^\d+\.\s+/.test(line.trim())).map((line) => line.replace(/^[-*]\s+|^\d+\.\s+/, '').trim()).filter(Boolean).slice(0, 6);
+    const report = await this.db.collection('saved_reports').add({
+      ownerId: userId,
+      ownerEmail: owner.email ?? '',
+      title: title.trim().slice(0, 140),
+      summary,
+      content: content.slice(0, 50000),
+      sources: normalizedSources,
+      sourceCount: normalizedSources.length,
+      keyFindings: findings,
+      relatedRecords,
+      executionId,
+      query: execution.data()?.query ?? '[Prompt retention disabled by user]',
+      model: execution.data()?.modelUsed ?? metrics?.model ?? '',
+      tokensInput: execution.data()?.tokensInput ?? metrics?.tokensInput ?? 0,
+      tokensOutput: execution.data()?.tokensOutput ?? metrics?.tokensOutput ?? 0,
+      cost: execution.data()?.cost ?? metrics?.cost ?? 0,
+      isPublic: isPublic === true,
+      ratingTotal: 0,
+      ratingCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    res.status(201).json({ id: report.id });
+  }
+
+  async listReports(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    if (!userId) { res.status(401).json({ error: 'Unauthorised' }); return; }
+    const scope = req.query.scope === 'mine' ? 'mine' : 'all';
+    const snapshot = await this.db.collection('saved_reports').limit(100).get();
+    const reports = snapshot.docs
+      .map((document) => {
+        const report = document.data();
+        if (scope === 'all' && !report.isPublic && report.ownerId !== userId) {
+          return {
+            id: document.id,
+            title: 'Report is private',
+            summary: 'The author has restricted access to this report.',
+            sourceCount: 0,
+            isPublic: false,
+            private: true,
+            createdAt: report.createdAt?.toDate?.()?.toISOString() ?? null,
+            ratingTotal: 0,
+            ratingCount: 0,
+          };
+        }
+        return this.serializeReport(document.id, report, userId);
+      })
+      .filter((report: any) => scope === 'mine'
+        ? report.ownerId === userId && report.isPublic !== true
+        : true);
+    reports.sort((left: any, right: any) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
+    res.json(reports);
+  }
+
+  private serializeReport(id: string, report: Record<string, any>, requesterId: string) {
+    const createdAt = report.createdAt?.toDate?.()?.toISOString() ?? report.createdAt ?? null;
+    return { id, ...report, createdAt, isOwner: report.ownerId === requesterId };
+  }
+
+  async getReport(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const document = await this.db.collection('saved_reports').doc(req.params.id).get();
+    if (!userId || !document.exists) { res.status(404).json({ error: 'Report not found.' }); return; }
+    const report = document.data()!;
+    if (!report.isPublic && report.ownerId !== userId) {
+      res.json({ id: document.id, title: report.title, summary: report.summary, createdAt: report.createdAt?.toDate?.()?.toISOString() ?? null, isPublic: false, private: true });
+      return;
+    }
+    res.json(this.serializeReport(document.id, report, userId));
+  }
+
+  async requestReportAccess(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const document = await this.db.collection('saved_reports').doc(req.params.id).get();
+    if (!userId || !document.exists) { res.status(404).json({ error: 'Report not found.' }); return; }
+    const report = document.data()!;
+    if (report.isPublic || report.ownerId === userId) { res.status(400).json({ error: 'This report does not require an access request.' }); return; }
+    const requester = await getAdminAuth().getUser(userId);
+    await this.db.collection('report_access_requests').add({ reportId: document.id, reportTitle: report.title, ownerId: report.ownerId, requesterId: userId, requesterEmail: requester.email ?? '', createdAt: new Date() });
+    await this.sendReportAccessRequest(report.ownerEmail, requester.email ?? '', report.title, document.id);
+    res.json({ success: true });
+  }
+
+  async deleteReport(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const reportRef = this.db.collection('saved_reports').doc(req.params.id);
+    const report = await reportRef.get();
+    if (!userId || !report.exists || report.data()?.ownerId !== userId) { res.status(403).json({ error: 'You can only delete your own reports.' }); return; }
+    await reportRef.delete();
+    res.json({ success: true });
+  }
+
+  async rateReport(req: Request, res: Response): Promise<void> {
+    const userId = (req as Request & { uid?: string }).uid;
+    const { rating } = req.body as { rating?: number };
+    if (!userId || (rating !== 1 && rating !== -1)) { res.status(400).json({ error: 'A valid rating is required.' }); return; }
+    const reportRef = this.db.collection('saved_reports').doc(req.params.id);
+    const voteRef = reportRef.collection('votes').doc(userId);
+    await this.db.runTransaction(async (transaction) => {
+      const [report, vote] = await Promise.all([transaction.get(reportRef), transaction.get(voteRef)]);
+      if (!report.exists) throw new Error('Report not found.');
+      if (vote.exists) throw new Error('You have already rated this report.');
+      transaction.set(voteRef, { userId, rating, createdAt: new Date() });
+      transaction.update(reportRef, { ratingTotal: FieldValue.increment(rating), ratingCount: FieldValue.increment(1), updatedAt: new Date() });
+    });
+    res.json({ success: true });
+  }
+
+  private async sendReportAccessRequest(ownerEmail: string, requesterEmail: string, reportTitle: string, reportId: string): Promise<void> {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey || !ownerEmail) return;
+    const reportUrl = `${process.env.PASSWORDLESS_CONTINUE_URL!.replace(/\/$/, '')}/saved-research?report=${reportId}`;
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM!, to: [ownerEmail], subject: `Access request for report: ${reportTitle}`, html: `<p>${requesterEmail || 'A Democratic AI user'} requested access to your private report.</p><p><a href="${reportUrl}">Review report</a></p>` }),
+    });
+    if (!response.ok) throw new Error(`Could not send access request email (${response.status}).`);
   }
 
   async recordAccessRequest(req: Request, res: Response): Promise<void> {
@@ -872,6 +1022,28 @@ class ChatAPI {
     }
   }
 
+  async listBillsForScope(_req: Request, res: Response): Promise<void> {
+    try {
+      const [rows] = await this.bq.query({
+        query: `
+          SELECT
+            bill_id AS id,
+            COALESCE(short_title, title, bill_id) AS title,
+            CAST(date_introduced AS STRING) AS date,
+            uri
+          FROM \`${BQ_PROJECT}.${BQ_DATASET}.bills\`
+          WHERE COALESCE(short_title, title, '') != ''
+          ORDER BY date_introduced DESC
+          LIMIT 100`,
+        location: 'US',
+      });
+      res.json({ documents: (rows as any[]).map((row) => ({ id: row.id, title: row.title, date: row.date, uri: toPublicSourceUrl(row.uri), source: 'bill', content: '' })) });
+    } catch (error) {
+      console.error('Failed to load bill scope options:', error);
+      res.status(500).json({ error: 'Could not load bill options.' });
+    }
+  }
+
   /**
    * Search parliamentary data in BigQuery using keyword matching.
    * Uses parameterised queries to prevent SQL injection.
@@ -942,9 +1114,9 @@ class ChatAPI {
       (
         SELECT
           'debate'            AS source_type,
-          speech_id           AS id,
-          COALESCE(show_as, speech_id) AS title,
-          SUBSTR(COALESCE(speech_text, show_as, ''), 0, 800) AS content,
+          COALESCE(debate_id, speech_id) AS id,
+          CONCAT(COALESCE(NULLIF(section_name, ''), NULLIF(show_as, ''), speech_id), ' | ', CAST(date AS STRING)) AS title,
+          SUBSTR(COALESCE(speech_text, section_name, show_as, ''), 0, 800) AS content,
           CAST(date AS STRING) AS date,
           uri,
           0.85                AS relevance
@@ -984,7 +1156,7 @@ class ChatAPI {
       content:     row.content,
       source:      row.source_type,
       date:        row.date,
-      uri:         row.uri,
+      uri:         toPublicSourceUrl(row.uri),
       relevance:   row.relevance,
     }));
   }
@@ -1089,6 +1261,7 @@ export function setupChatRoutes(app: express.Application): void {
   app.post('/api/feedback',       requireAuth, (req, res) => chatAPI.recordStructuredFeedback(req, res));
   app.get('/api/chat/metrics',    requireAuth, (req, res) => chatAPI.getMetrics(req, res));
   app.post('/api/search',         requireAuth, (req, res) => chatAPI.searchContext(req, res));
+  app.get('/api/reference/bills', requireAuth, (req, res) => chatAPI.listBillsForScope(req, res));
   app.get('/api/data-status',         (req, res) => chatAPI.getDataStatus(req, res));
   app.post('/api/access-requests',     (req, res) => chatAPI.recordAccessRequest(req, res));
   app.delete('/api/chat/history', requireAuth, (req, res) => chatAPI.deleteChatHistory(req, res));
@@ -1097,4 +1270,10 @@ export function setupChatRoutes(app: express.Application): void {
   app.post('/api/prompts', requireAuth, (req, res) => chatAPI.createSavedPrompt(req, res));
   app.get('/api/prompts', requireAuth, (req, res) => chatAPI.listSavedPrompts(req, res));
   app.post('/api/prompts/:id/rating', requireAuth, (req, res) => chatAPI.rateSavedPrompt(req, res));
+  app.post('/api/reports', requireAuth, (req, res) => chatAPI.createReport(req, res));
+  app.get('/api/reports', requireAuth, (req, res) => chatAPI.listReports(req, res));
+  app.get('/api/reports/:id', requireAuth, (req, res) => chatAPI.getReport(req, res));
+  app.post('/api/reports/:id/access-requests', requireAuth, (req, res) => chatAPI.requestReportAccess(req, res));
+  app.delete('/api/reports/:id', requireAuth, (req, res) => chatAPI.deleteReport(req, res));
+  app.post('/api/reports/:id/rating', requireAuth, (req, res) => chatAPI.rateReport(req, res));
 }

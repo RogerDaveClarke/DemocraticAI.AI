@@ -13,13 +13,26 @@ import {
   Link2,
   MessageCircle,
   Plus,
+  Printer,
   Search,
   Share2,
   Star,
   Trash2,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { PageShell } from '@/components/patterns/PageShell';
+import { apiDelete, apiGet, apiPost } from '@/utils/api';
+import ReactMarkdown from 'react-markdown';
+import { toPublicOfficialSourceUrl } from '@/utils/officialSources';
+
+type ReportSource = { id: string; title: string; uri?: string; source?: string; date?: string };
+type SavedReport = {
+  id: string; title: string; summary: string; content: string; sources: ReportSource[]; sourceCount: number;
+  keyFindings: string[]; relatedRecords: ReportSource[]; createdAt?: { seconds?: number } | string; isPublic: boolean;
+  ratingTotal: number; ratingCount: number; model: string; tokensInput: number; tokensOutput: number; cost: number;
+  private?: boolean; isOwner?: boolean;
+};
 
 const savedItems = [
   {
@@ -80,6 +93,70 @@ const statCards = [
 ];
 
 export default function SavedResearch() {
+  const [tab, setTab] = useState<'all' | 'mine'>(() => new URLSearchParams(window.location.search).get('scope') === 'mine' ? 'mine' : 'all');
+  const [reports, setReports] = useState<SavedReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
+  const [detailTab, setDetailTab] = useState<'summary' | 'findings' | 'sources' | 'related'>('summary');
+  const [error, setError] = useState('');
+  const [ratingNotice, setRatingNotice] = useState('');
+  const [ratedReportIds, setRatedReportIds] = useState<Set<string>>(new Set());
+  const [directReportId] = useState(() => new URLSearchParams(window.location.search).get('report'));
+  const [accessNotice, setAccessNotice] = useState('');
+
+  const loadReports = async (scope: 'all' | 'mine') => {
+    try {
+      setError('');
+      const loadedReports = await apiGet<SavedReport[]>(`/api/reports?scope=${scope}`);
+      setReports(loadedReports);
+      setSelectedReport(loadedReports[0] ?? null);
+    } catch {
+      setError('Could not load saved reports.');
+      setReports([]);
+      setSelectedReport(null);
+    }
+  };
+
+  useEffect(() => { void loadReports(tab); }, [tab]);
+
+  useEffect(() => {
+    if (!directReportId) return;
+    apiGet<SavedReport>(`/api/reports/${directReportId}`)
+      .then((report) => setSelectedReport(report))
+      .catch(() => setError('Could not load this report.'));
+  }, [directReportId]);
+
+  const formatDate = (report: SavedReport) => {
+    const value = typeof report.createdAt === 'string' ? new Date(report.createdAt) : report.createdAt?.seconds ? new Date(report.createdAt.seconds * 1000) : null;
+    return value && !Number.isNaN(value.getTime()) ? value.toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date unavailable';
+  };
+  const rateReport = async (report: SavedReport, rating: 1 | -1) => {
+    if (ratedReportIds.has(report.id)) return;
+    setRatedReportIds((rated) => new Set(rated).add(report.id));
+    setRatingNotice('Rating saved.');
+    const applyRating = (item: SavedReport) => item.id === report.id ? { ...item, ratingTotal: item.ratingTotal + rating, ratingCount: item.ratingCount + 1 } : item;
+    setReports((currentReports) => currentReports.map(applyRating));
+    setSelectedReport((currentReport) => currentReport ? applyRating(currentReport) : null);
+    try { await apiPost(`/api/reports/${report.id}/rating`, { rating }); }
+    catch {
+      setRatingNotice('You have already rated this report.');
+      setReports((currentReports) => currentReports.map((item) => item.id === report.id ? { ...item, ratingTotal: item.ratingTotal - rating, ratingCount: Math.max(0, item.ratingCount - 1) } : item));
+      setSelectedReport((currentReport) => currentReport?.id === report.id ? { ...currentReport, ratingTotal: currentReport.ratingTotal - rating, ratingCount: Math.max(0, currentReport.ratingCount - 1) } : currentReport);
+    }
+  };
+  const deleteReport = async (report: SavedReport) => {
+    if (!confirm(`Delete ${report.title}?`)) return;
+    try { await apiDelete(`/api/reports/${report.id}`); await loadReports(tab); } catch { setError('Could not delete this report.'); }
+  };
+  const shareReport = async (report: SavedReport) => { await navigator.clipboard.writeText(`${window.location.origin}/saved-research?report=${report.id}`); };
+  const requestAccess = async (report: SavedReport) => {
+    try {
+      await apiPost(`/api/reports/${report.id}/access-requests`, {});
+      setAccessNotice('Access request sent to the report author.');
+    } catch {
+      setAccessNotice('Could not send the access request.');
+    }
+  };
+
   return (
     <PageShell>
       <div className="rounded-2xl border border-[var(--dai-border)] bg-white p-4 shadow-sm sm:p-6">
@@ -108,10 +185,8 @@ export default function SavedResearch() {
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--dai-border)] pb-0">
           <div className="flex items-center gap-6 text-sm font-semibold text-[var(--dai-slate)]">
-            <button type="button" className="border-b-2 border-[var(--color-teal-600)] pb-3 text-[var(--color-teal-600)]">All Saved</button>
-            <button type="button" className="pb-3 hover:text-[var(--dai-ink)]">Reports</button>
-            <button type="button" className="pb-3 hover:text-[var(--dai-ink)]">Conversations</button>
-            <button type="button" className="pb-3 hover:text-[var(--dai-ink)]">Prompts</button>
+            <button type="button" onClick={() => setTab('all')} className={`border-b-2 pb-3 ${tab === 'all' ? 'border-[var(--color-teal-600)] text-[var(--color-teal-600)]' : 'border-transparent hover:text-[var(--dai-ink)]'}`}>All Saved</button>
+            <button type="button" onClick={() => setTab('mine')} className={`border-b-2 pb-3 ${tab === 'mine' ? 'border-[var(--color-teal-600)] text-[var(--color-teal-600)]' : 'border-transparent hover:text-[var(--dai-ink)]'}`}>My Reports</button>
           </div>
           <button type="button" className="mb-2 inline-flex items-center gap-2 rounded-lg bg-[var(--color-teal-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-teal-500)]">
             <Plus className="h-4 w-4" />
@@ -141,30 +216,31 @@ export default function SavedResearch() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
         <section className="xl:col-span-6 space-y-3">
-          {savedItems.map((item) => {
-            const Icon = item.icon;
+          {ratingNotice && <p className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-800">{ratingNotice}</p>}
+          {error ? <p className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p> : reports.length === 0 ? <p className="rounded-xl border border-[var(--dai-border)] bg-white p-4 text-sm text-[var(--dai-slate)]">{tab === 'mine' ? 'You have not saved any private reports yet.' : 'No public reports have been saved yet.'}</p> : reports.map((item) => {
             return (
               <article
-                key={item.title}
-                className={`rounded-2xl border p-4 shadow-sm ${item.active ? 'border-[var(--color-teal-500)] bg-[#eafaf8]' : 'border-[var(--dai-border)] bg-white'}`}
+                key={item.id}
+                onClick={() => { setSelectedReport(item); setDetailTab('summary'); }}
+                className={`cursor-pointer rounded-2xl border p-4 shadow-sm ${selectedReport?.id === item.id ? 'border-[var(--color-teal-500)] bg-[#eafaf8]' : 'border-[var(--dai-border)] bg-white hover:border-teal-200'}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex gap-3">
-                    <div className={`rounded-xl p-2 ${item.active ? 'bg-teal-100 text-teal-700' : 'bg-[var(--dai-muted)] text-[var(--dai-slate)]'}`}>
-                      <Icon className="h-5 w-5" />
+                    <div className="rounded-xl bg-teal-50 p-2 text-teal-700">
+                      <FileText className="h-5 w-5" />
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-[var(--dai-ink)]">{item.title}</h3>
                       <p className="mt-1 text-sm text-[var(--dai-slate)]">{item.summary}</p>
                       <div className="mt-2 flex items-center gap-4 text-xs text-[var(--dai-slate)]">
-                        <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{item.date}</span>
-                        <span className="inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" />{item.sources} sources</span>
+                        <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatDate(item)}</span>
+                        <span className="inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" />{item.sourceCount} sources</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-3">
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--color-teal-600)] border border-[var(--dai-border)]">{item.type}</span>
-                    <Star className="h-4 w-4 text-[var(--dai-slate)]" />
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${item.isPublic ? 'border-teal-200 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-600'}`}>{item.isPublic ? 'Public' : 'Private'}</span>
+                    <button type="button" disabled={ratedReportIds.has(item.id)} onClick={(event) => { event.stopPropagation(); void rateReport(item, 1); }} title={ratedReportIds.has(item.id) ? 'Report rated' : 'Rate this report'} className={`inline-flex items-center gap-1 text-xs disabled:cursor-default ${ratedReportIds.has(item.id) ? 'text-amber-600' : 'text-[var(--dai-slate)] hover:text-amber-600'}`}><Star className={`h-4 w-4 ${ratedReportIds.has(item.id) ? 'fill-current' : ''}`} />{item.ratingCount}</button>
                   </div>
                 </div>
               </article>
@@ -185,81 +261,50 @@ export default function SavedResearch() {
         </section>
 
         <section className="xl:col-span-6 rounded-2xl border border-[var(--dai-border)] bg-white p-5 shadow-sm">
+          {selectedReport?.private ? <div className="py-8 text-center"><FileText className="mx-auto h-8 w-8 text-slate-400" /><h2 className="mt-3 text-lg font-semibold text-[var(--dai-ink)]">Report is private</h2><p className="mx-auto mt-2 max-w-sm text-sm text-[var(--dai-slate)]">Only the author can view this report and its source material.</p>{accessNotice && <p className="mt-3 text-sm text-teal-700">{accessNotice}</p>}<button type="button" onClick={() => void requestAccess(selectedReport)} className="mt-4 rounded-lg bg-[var(--color-teal-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-teal-500)]">Request Access</button></div> : selectedReport ? <>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-4xl font-bold text-[var(--dai-ink)]">Housing Crisis: Key Themes and Party Positions</h2>
+              <h2 className="text-2xl font-bold text-[var(--dai-ink)]">{selectedReport.title}</h2>
               <div className="mt-2 flex items-center gap-3 text-xs text-[var(--dai-slate)]">
-                <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />27 May 2025</span>
-                <span className="inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" />12 sources</span>
-                <span className="rounded-full bg-[var(--dai-muted)] px-2 py-0.5">Housing</span>
+                <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatDate(selectedReport)}</span>
+                <span className="inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" />{selectedReport.sourceCount} sources</span>
+                <span className={`rounded-full px-2 py-0.5 ${selectedReport.isPublic ? 'bg-teal-50 text-teal-700' : 'bg-[var(--dai-muted)]'}`}>{selectedReport.isPublic ? 'Public' : 'Private'}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-[var(--dai-border)] bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Report</span>
-              <button type="button" className="rounded-lg border border-[var(--dai-border)] p-2 text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]"><Star className="h-4 w-4" /></button>
-              <button type="button" className="rounded-lg border border-[var(--dai-border)] p-2 text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]"><CircleEllipsis className="h-4 w-4" /></button>
+              <button type="button" disabled={ratedReportIds.has(selectedReport.id)} onClick={() => void rateReport(selectedReport, 1)} title={ratedReportIds.has(selectedReport.id) ? 'Report rated' : 'Rate this report'} className={`rounded-lg border border-[var(--dai-border)] p-2 disabled:cursor-default ${ratedReportIds.has(selectedReport.id) ? 'text-amber-600' : 'text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]'}`}><Star className={`h-4 w-4 ${ratedReportIds.has(selectedReport.id) ? 'fill-current' : ''}`} /></button>
             </div>
           </div>
 
           <div className="mt-4 flex items-center gap-6 border-b border-[var(--dai-border)] text-sm font-semibold text-[var(--dai-slate)]">
-            <button type="button" className="border-b-2 border-[var(--color-teal-600)] pb-2 text-[var(--color-teal-600)]">Summary</button>
-            <button type="button" className="pb-2 hover:text-[var(--dai-ink)]">Key Findings</button>
-            <button type="button" className="pb-2 hover:text-[var(--dai-ink)]">Sources (12)</button>
-            <button type="button" className="pb-2 hover:text-[var(--dai-ink)]">Related</button>
+            {(['summary', 'findings', 'sources', 'related'] as const).map((item) => <button key={item} type="button" onClick={() => setDetailTab(item)} className={`border-b-2 pb-2 capitalize ${detailTab === item ? 'border-[var(--color-teal-600)] text-[var(--color-teal-600)]' : 'border-transparent hover:text-[var(--dai-ink)]'}`}>{item === 'findings' ? 'Key Findings' : item === 'sources' ? `Sources (${selectedReport.sourceCount})` : item}</button>)}
           </div>
 
-          <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50 p-4">
+          {detailTab === 'summary' && <div className="mt-4 space-y-4">
+            <div className="rounded-xl border border-teal-100 bg-teal-50 p-4">
             <div className="flex items-start gap-3">
               <Lightbulb className="mt-0.5 h-5 w-5 text-[var(--color-teal-600)]" />
               <div>
                 <p className="text-sm font-semibold text-[var(--dai-ink)]">Research Summary</p>
                 <p className="mt-1 text-sm text-[var(--dai-slate)]">
-                  Comprehensive analysis of the housing crisis based on recent Oireachtas debates, statements and legislation.
-                  Identifies the main themes, government actions and differences in party positions.
+                  {selectedReport.summary}
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-[var(--dai-border)] p-4">
-            <p className="text-sm font-semibold text-[var(--dai-ink)]">Key Topics</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {['Housing Supply', 'Affordability', 'Planning Reform', 'Social Housing', 'Rent Controls'].map((topic) => (
-                <span key={topic} className="rounded-full bg-[var(--dai-muted)] px-2.5 py-1 text-xs text-[var(--dai-slate)]">{topic}</span>
-              ))}
             </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-[var(--dai-border)] p-4">
-            <p className="text-sm font-semibold text-[var(--dai-ink)]">Main Insights</p>
-            <ul className="mt-2 space-y-2 text-sm text-[var(--dai-slate)]">
-              {summaryBullets.map((insight) => (
-                <li key={insight} className="flex items-start gap-2">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>{insight}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+            <div className="prose prose-sm max-w-none text-[var(--dai-ink)]"><ReactMarkdown>{selectedReport.content}</ReactMarkdown></div>
+          </div>}
+          {detailTab === 'findings' && <ul className="mt-4 space-y-2 text-sm text-[var(--dai-slate)]">{selectedReport.keyFindings.length ? selectedReport.keyFindings.map((finding) => <li key={finding} className="flex gap-2"><span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />{finding}</li>) : <li>No key findings were extracted from this report.</li>}</ul>}
+          {detailTab === 'sources' && <ol className="mt-4 space-y-3">{selectedReport.sources.map((source, index) => <li key={`${source.id}-${index}`} className="border-b border-slate-100 pb-3 text-sm">{toPublicOfficialSourceUrl(source.uri) ? <a href={toPublicOfficialSourceUrl(source.uri)} target="_blank" rel="noreferrer" className="font-medium text-teal-700 hover:underline">{index + 1}. {source.title}</a> : <span className="font-medium text-[var(--dai-ink)]">{index + 1}. {source.title}</span>}<p className="mt-1 text-xs text-[var(--dai-slate)]">{source.source} {source.date ? `| ${source.date}` : ''}</p></li>)}</ol>}
+          {detailTab === 'related' && <div className="mt-4"><p className="mb-3 text-xs text-[var(--dai-slate)]">Further reading related to this report. These records were not used as evidence for its findings.</p><ol className="space-y-3">{selectedReport.relatedRecords.length ? selectedReport.relatedRecords.map((source, index) => <li key={`${source.id}-${index}`} className="border-b border-slate-100 pb-3 text-sm">{toPublicOfficialSourceUrl(source.uri) ? <a href={toPublicOfficialSourceUrl(source.uri)} target="_blank" rel="noreferrer" className="font-medium text-teal-700 hover:underline">{source.title}</a> : <span className="font-medium text-[var(--dai-ink)]">{source.title}</span>}<p className="mt-1 text-xs text-[var(--dai-slate)]">{source.source} {source.date ? `| ${source.date}` : ''}</p></li>) : <li className="text-sm text-[var(--dai-slate)]">No additional related records were found.</li>}</ol></div>}
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-teal-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-teal-500)]">
-              <MessageCircle className="h-4 w-4" />
-              Continue Research
-            </button>
-            <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]">
-              <Download className="h-4 w-4" />
-              Download PDF
-            </button>
-            <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]">
-              <Share2 className="h-4 w-4" />
-              Share Link
-            </button>
-            <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]">
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
+            <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-teal-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-teal-500)]"><Download className="h-4 w-4" />Download PDF</button>
+            <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]"><Printer className="h-4 w-4" />Print</button>
+            <button type="button" onClick={() => void shareReport(selectedReport)} className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--dai-slate)] hover:bg-[var(--dai-muted)]"><Share2 className="h-4 w-4" />Share Link</button>
+            <button type="button" onClick={() => void deleteReport(selectedReport)} className="inline-flex items-center gap-2 rounded-lg border border-[var(--dai-border)] bg-white px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" />Delete</button>
           </div>
+          </> : <p className="text-sm text-[var(--dai-slate)]">Select a report to review its saved analysis and sources.</p>}
         </section>
       </div>
     </PageShell>
