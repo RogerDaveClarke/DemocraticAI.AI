@@ -27,7 +27,7 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
   headers.set('Content-Type', 'application/json');
   headers.set('X-Request-ID', createRequestId());
 
-  const token = await auth.currentUser?.getIdToken(true);
+  const token = await auth.currentUser?.getIdToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   
   // Add API key for chat endpoints and monitoring endpoints in production

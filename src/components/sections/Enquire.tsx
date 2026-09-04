@@ -184,6 +184,7 @@ export default function Enquire() {
   const [scopeRecords, setScopeRecords] = useState<SearchDocument[]>([]);
   const [scopeValues, setScopeValues] = useState({ memberOne: '', memberTwo: '', debate: '', bill: '', period: '' });
   const [scopeLoading, setScopeLoading] = useState(false);
+  const [scopeError, setScopeError] = useState('');
   const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, cost: 0, requests: 0, lastTokens: 0, lastCost: 0 });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -660,6 +661,27 @@ export default function Enquire() {
     }
   };
 
+  const loadPromptScopeOptions = (scope: PromptScope) => {
+    const withTimeout = <T,>(request: Promise<T>): Promise<T> => Promise.race([
+      request,
+      new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error('Loading official records timed out.')), 12000)),
+    ]);
+    setScopeLoading(true);
+    setScopeError('');
+    Promise.all([
+      scope.requiresMembers ? withTimeout(apiGet<{ members?: Array<{ id?: string; memberId?: string; memberCode?: string; showAs?: string; fullName?: string; name?: string }> }>('/api/members?limit=100&active_only=true')) : Promise.resolve({ members: [] }),
+      scope.requiresDebate ? withTimeout(apiGet<{ documents?: SearchDocument[] }>('/api/reference/debates')) : Promise.resolve({ documents: [] }),
+      scope.requiresBill ? withTimeout(apiGet<{ documents?: SearchDocument[] }>('/api/reference/bills')) : Promise.resolve({ documents: [] }),
+    ]).then(([memberResponse, debateResponse, billResponse]) => {
+      setScopeMembers((memberResponse.members || []).map((member) => ({ id: member.id || member.memberId || member.memberCode || member.showAs || '', label: member.showAs || member.fullName || member.name || 'Unnamed member' })).filter((member) => member.id));
+      const uniqueRecords = [...(debateResponse.documents || []), ...(billResponse.documents || [])].filter((record, index, records) => records.findIndex((candidate) => candidate.source === record.source && candidate.id === record.id) === index);
+      setScopeRecords(uniqueRecords);
+    }).catch((error) => {
+      console.error('Failed to load prompt scope options:', error);
+      setScopeError(error instanceof Error ? error.message : 'Could not load official records.');
+    }).finally(() => setScopeLoading(false));
+  };
+
   const handlePromptSelect = (promptText: string, _promptId: string) => {
     setShowPromptLibrary(false);
     const normalized = promptText.toLowerCase();
@@ -674,16 +696,7 @@ export default function Enquire() {
     if (scope.requiresMembers || scope.requiresDebate || scope.requiresBill || scope.requiresPeriod) {
       setPromptScope(scope);
       setScopeValues({ memberOne: '', memberTwo: '', debate: '', bill: '', period: '' });
-      setScopeLoading(true);
-      Promise.all([
-        scope.requiresMembers ? apiGet<{ members?: Array<{ id?: string; memberId?: string; memberCode?: string; showAs?: string; fullName?: string; name?: string }> }>('/api/members?limit=100&active_only=true') : Promise.resolve({ members: [] }),
-        scope.requiresDebate ? apiPost<{ documents?: SearchDocument[] }>('/api/search', { query: 'debate', limit: 50 }) : Promise.resolve({ documents: [] }),
-        scope.requiresBill ? apiGet<{ documents?: SearchDocument[] }>('/api/reference/bills') : Promise.resolve({ documents: [] }),
-      ]).then(([memberResponse, debateResponse, billResponse]) => {
-        setScopeMembers((memberResponse.members || []).map((member) => ({ id: member.id || member.memberId || member.memberCode || member.showAs || '', label: member.showAs || member.fullName || member.name || 'Unnamed member' })).filter((member) => member.id));
-        const uniqueRecords = [...(debateResponse.documents || []), ...(billResponse.documents || [])].filter((record, index, records) => records.findIndex((candidate) => candidate.source === record.source && candidate.id === record.id) === index);
-        setScopeRecords(uniqueRecords);
-      }).catch((error) => console.error('Failed to load prompt scope options:', error)).finally(() => setScopeLoading(false));
+      loadPromptScopeOptions(scope);
       return;
     }
     setSelectedPromptId(_promptId);
@@ -1396,7 +1409,7 @@ export default function Enquire() {
               <button type="button" onClick={() => setPromptScope(null)} aria-label="Cancel prompt scope" className="rounded-md p-1 text-[var(--dai-slate)] hover:bg-slate-100"><X size={18} /></button>
             </div>
             <p className="mb-4 rounded-md bg-[var(--dai-muted)] p-3 text-sm text-[var(--dai-ink)]">{promptScope.promptText}</p>
-            {scopeLoading ? <p className="text-sm text-[var(--dai-slate)]">Loading official records...</p> : <div className="space-y-3">
+            {scopeLoading ? <p className="text-sm text-[var(--dai-slate)]">Loading official records...</p> : scopeError ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>{scopeError}</p><button type="button" onClick={() => loadPromptScopeOptions(promptScope)} className="mt-2 font-medium text-teal-700 hover:underline">Try again</button></div> : <div className="space-y-3">
               {promptScope.requiresMembers >= 1 && <label className="block text-xs font-medium text-[var(--dai-slate)]">{promptScope.requiresMembers === 2 ? 'First member' : 'Member'}<select value={scopeValues.memberOne} onChange={(event) => setScopeValues((values) => ({ ...values, memberOne: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a member</option>{scopeMembers.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
               {promptScope.requiresMembers === 2 && <label className="block text-xs font-medium text-[var(--dai-slate)]">Second member<select value={scopeValues.memberTwo} onChange={(event) => setScopeValues((values) => ({ ...values, memberTwo: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a member</option>{scopeMembers.filter((member) => member.id !== scopeValues.memberOne).map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
               {promptScope.requiresDebate && <label className="block text-xs font-medium text-[var(--dai-slate)]">Debate<select value={scopeValues.debate} onChange={(event) => setScopeValues((values) => ({ ...values, debate: event.target.value }))} className="mt-1 w-full rounded-md border border-[var(--dai-border)] bg-white px-3 py-2 text-sm text-[var(--dai-ink)]"><option value="">Select a debate</option>{scopeRecords.filter((record) => record.source === 'debate').map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}</select></label>}
