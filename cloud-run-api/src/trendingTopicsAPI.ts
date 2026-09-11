@@ -9,7 +9,10 @@ import NodeCache from 'node-cache';
 const router = express.Router();
 
 function neutralizeLogValue(value: unknown): string {
-  return String(value).replace(/[\r\n\t\u0000-\u001f\u007f-\u009f]/g, ' ');
+  return Array.from(String(value), (character) => {
+    const codePoint = character.charCodeAt(0);
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? ' ' : character;
+  }).join('');
 }
 
 // Initialize services
@@ -52,7 +55,7 @@ router.get('/trending-topics', async (_req: Request, res: Response) => {
   try {
     // Check cache first
     const cacheKey = 'trending-topics-list';
-    let cachedData = cache.get<TrendingTopicsResponse>(cacheKey);
+    const cachedData = cache.get<TrendingTopicsResponse>(cacheKey);
     
     if (cachedData) {
       console.log('Returning cached trending topics');
@@ -90,7 +93,7 @@ router.get('/trending-topics/:id', async (req: Request, res: Response) => {
     
     // Check cache first
     const cacheKey = `trending-topic-${topicId}`;
-    let cachedData = cache.get(cacheKey);
+    const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
       return res.json(cachedData);

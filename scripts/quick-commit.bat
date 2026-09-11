@@ -1,6 +1,6 @@
 @echo off
-REM Simple batch script for git commits (alternative to PowerShell)
-REM Usage: quick-commit.bat "commit message" [type]
+REM Secure batch script for git commits (alternative to PowerShell)
+REM Usage: quick-commit.bat "commit message" [type] [--push]
 
 setlocal enabledelayedexpansion
 
@@ -13,6 +13,7 @@ if "%1"=="" (
 
 set "message=%~1"
 set "type=%2"
+set "push=%3"
 
 if not "%type%"=="" (
     set "full_message=%type%: %message%"
@@ -22,6 +23,13 @@ if not "%type%"=="" (
 
 echo Adding all files...
 git add .
+
+echo Running repository security verification...
+npm run verify:repo-security
+if errorlevel 1 (
+    echo Security verification failed. Commit aborted; staged files were not committed.
+    exit /b 1
+)
 
 echo Committing with message: !full_message!
 git commit -m "!full_message!"
@@ -33,9 +41,7 @@ if errorlevel 1 (
 
 echo Commit successful!
 
-REM Ask if user wants to push
-set /p push_choice="Push to remote? (y/N): "
-if /i "!push_choice!"=="y" (
+if /i "%push%"=="--push" (
     echo Pushing to remote...
     git push
     if errorlevel 1 (
@@ -43,6 +49,10 @@ if /i "!push_choice!"=="y" (
         exit /b 1
     )
     echo Push successful!
+)
+
+if /i not "%push%"=="--push" (
+    echo No push performed. Use --push as the third argument to push.
 )
 
 echo Done!

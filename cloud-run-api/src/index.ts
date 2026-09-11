@@ -6,9 +6,9 @@ if (typeof process.loadEnvFile === 'function') {
   const localEnvPath = path.resolve(process.cwd(), '.env.local');
   const parentEnvPath = path.resolve(process.cwd(), '../.env.local');
   if (fs.existsSync(localEnvPath)) {
-    try { process.loadEnvFile(localEnvPath); } catch (e) {}
+    try { process.loadEnvFile(localEnvPath); } catch { /* Environment validation reports invalid values later. */ }
   } else if (fs.existsSync(parentEnvPath)) {
-    try { process.loadEnvFile(parentEnvPath); } catch (e) {}
+    try { process.loadEnvFile(parentEnvPath); } catch { /* Environment validation reports invalid values later. */ }
   }
 }
 
@@ -114,7 +114,7 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID'],
   credentials: true
 }));
 
@@ -183,8 +183,27 @@ const chatLimiter = rateLimit({
   }
 });
 
+const publicReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.PUBLIC_READ_RATE_LIMIT_MAX || '60'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Public data request limit reached. Please try again shortly.' },
+});
+
+const publicReferenceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.PUBLIC_REFERENCE_RATE_LIMIT_MAX || '15'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Reference data request limit reached. Please try again shortly.' },
+});
+
 // Apply general rate limiting to all requests
 app.use(generalLimiter);
+app.use('/api/members', publicReadLimiter);
+app.use('/api/filters', publicReadLimiter);
+app.use('/api/reference', publicReferenceLimiter);
 
 // Apply API usage monitoring to all requests
 app.use(usageMonitor.getMiddleware());
@@ -365,7 +384,10 @@ interface MembersResponse {
 
 // Utility functions
 const neutralizeLogValue = (value: unknown): string => {
-  return String(value).replace(/[\r\n\t\u0000-\u001f\u007f-\u009f]/g, ' ');
+  return Array.from(String(value), (character) => {
+    const codePoint = character.charCodeAt(0);
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? ' ' : character;
+  }).join('');
 };
 
 const logError = (message: string, error: any) => {
@@ -497,6 +519,7 @@ app.get('/api/debug', validateApiKey, async (req: express.Request, res: express.
 // GET /api/filters
 app.get('/api/filters', async (_req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
     const cacheKey = CACHE_KEYS.FILTERS;
     let filters = cache.get<FiltersResponse>(cacheKey);
     
@@ -551,6 +574,7 @@ app.get('/api/filters', async (_req, res) => {
 // GET /api/members
 app.get('/api/members', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
     const {
       party,
       house,

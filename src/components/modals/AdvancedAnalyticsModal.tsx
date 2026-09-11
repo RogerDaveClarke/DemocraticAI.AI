@@ -1207,7 +1207,7 @@ export default function AdvancedAnalyticsModal({ isOpen, onClose, featureId, emb
     };
 
     // Apply filters to modify data
-    let filteredData = { ...baseData };
+    const filteredData = { ...baseData };
 
     // Bill filter adjustments
     if (selectedBillFilter === 'housing') {
@@ -1487,7 +1487,7 @@ export default function AdvancedAnalyticsModal({ isOpen, onClose, featureId, emb
           type: 'Disorderly Conduct',
           debate: 'Rural Infrastructure Investment',
           severity: 'Moderate',
-          spokenText: "You\'ve abandoned rural Ireland completely! This is a disgrace to every farmer and rural family!",
+          spokenText: "You've abandoned rural Ireland completely! This is a disgrace to every farmer and rural family!",
           action: 'Warning about tone and language',
           context: 'Frustrated response to cuts in rural development funding',
           debateId: '2024-RI-002',
@@ -1498,7 +1498,7 @@ export default function AdvancedAnalyticsModal({ isOpen, onClose, featureId, emb
           type: 'Interruption',
           debate: 'Cork Regional Development Plan',
           severity: 'Moderate',
-          spokenText: "That\'s absolute nonsense and you know it! Cork has been left behind for decades!",
+          spokenText: "That's absolute nonsense and you know it! Cork has been left behind for decades!",
           action: 'Asked to wait for proper speaking time',
           context: 'Interrupted minister during response about Cork development priorities',
           debateId: '2024-CD-001',
@@ -1546,7 +1546,7 @@ export default function AdvancedAnalyticsModal({ isOpen, onClose, featureId, emb
           type: 'Disorderly Conduct',
           debate: 'Climate Emergency Declaration Review',
           severity: 'High',
-          spokenText: "This is climate vandalism! You\'re destroying our children\'s future while corporations profit!",
+          spokenText: "This is climate vandalism! You're destroying our children's future while corporations profit!",
           action: 'Formal reprimand and 5-minute suspension',
           context: 'Refused to resume seat after multiple requests during climate debate',
           debateId: '2024-CE-002',

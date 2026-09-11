@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
-    name: Run Vulnerability Scans
+    name: Run Security Verification
     runs-on: ubuntu-latest
 
     steps:
@@ -22,22 +25,26 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
-      # Step 3: Check npm dependencies for known vulnerabilities (SCA)
-      - name: Check Package Dependencies (npm audit)
+      # Step 3: Install pinned security tooling used by repository verification
+      - name: Install Semgrep (pinned)
         run: |
-          npm ci # Clean install dependencies
-          npm audit --audit-level=high # Fails the build only for High/Critical issues
+          python -m pip install --upgrade pip
+          pip install semgrep==1.85.0
 
-      # Step 4: Scan React code for security flaws (SAST)
-      - name: Static Code Analysis (Semgrep)
+      - name: Install gitleaks (pinned)
         run: |
-          pip install semgrep
-          semgrep scan --config=auto --error
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
 
-      # Step 5: Scan repository for leaked Google/Firebase Secrets
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      # Step 4: Scan repository history for leaked Google/Firebase secrets
       - name: Secret Detection (TruffleHog)
         uses: trufflesecurity/trufflehog@1ea7fc1960b818e3c3ac3984f85922e3acba4061
         with:
@@ -45,3 +52,9 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
           extra_args: --debug --only-verified
+
+      # Step 5: Run repository-owned canonical verification command
+      - name: Repository Security Verification
+        run: |
+          npm ci
+          npm run verify:repo-security

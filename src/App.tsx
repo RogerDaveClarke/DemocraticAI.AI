@@ -37,6 +37,16 @@ const Admin = lazy(() => import('./components/sections/Admin'));
 type Section = 'home' | 'research' | 'admin' | 'research-library' | 'saved-research' | 'ai-integrity' | 'responsible-ai' | 'platform-status' | 'about' | 'architecture' | 'virtual-dail' | 'officials' | 'personas' | 'debates' | 'voting' | 'qa' | 'advanced-ai-analytics' | 'bias-detection' | 'attendance' | 'statistics' | 'analytics' | 'fun';
 
 const DEFAULT_SECTION: Section = 'home';
+const AUTHENTICATED_SECTIONS: Section[] = [
+  'research',
+  'research-library',
+  'saved-research',
+  'ai-integrity',
+  'advanced-ai-analytics',
+  'bias-detection',
+  'analytics',
+  'admin',
+];
 
 const legacySectionAliases: Record<string, Section> = {
   'ai-insights': 'research-library',
@@ -81,7 +91,11 @@ const getSectionFromPath = (pathname: string): Section => {
     return DEFAULT_SECTION;
   }
 
-  const section = match[1];
+  const section = match[1].replace(/\.html$/i, '');
+
+  if (section === 'index') {
+    return DEFAULT_SECTION;
+  }
 
   if (section && legacySectionAliases[section]) {
     return legacySectionAliases[section];
@@ -100,8 +114,12 @@ const getCanonicalTrackerPath = (pathname: string): string | null => {
     return '/home';
   }
 
-  const section = match[1];
+  const section = match[1].replace(/\.html$/i, '');
   if (!section) {
+    return '/home';
+  }
+
+  if (section === 'index') {
     return '/home';
   }
 
@@ -169,13 +187,13 @@ function App() {
 
   useEffect(() => {
     pageView(pathname);
-    document.title = 'DemocraticAI';
+    document.title = `${getSectionTitle(currentSection)} | Democratic AI`;
   }, [pathname, currentSection]);
 
   useEffect(() => {
     const canonicalPath = getCanonicalTrackerPath(pathname);
     if (canonicalPath && canonicalPath !== pathname) {
-      window.history.replaceState({}, '', canonicalPath);
+      window.history.replaceState({}, '', `${canonicalPath}${window.location.search}${window.location.hash}`);
       setPathname(canonicalPath);
     }
   }, [pathname]);
@@ -188,12 +206,12 @@ function App() {
     );
   }
 
-  if (authState === 'unauthenticated') {
+  if (authState === 'unauthenticated' && AUTHENTICATED_SECTIONS.includes(currentSection)) {
     return <SignInPage redirectError={redirectError} />;
   }
 
   // Force MFA enrollment before the app is accessible.
-  if (mfaEnrolled === false && user) {
+  if (AUTHENTICATED_SECTIONS.includes(currentSection) && mfaEnrolled === false && user) {
     return <MfaEnrollModal user={user} onComplete={() => signOut(auth)} />;
   }
 
@@ -254,6 +272,7 @@ function App() {
         currentSection={currentSection}
         onBackToHome={handleBackToHome}
         isAdmin={isAdmin}
+        isAuthenticated={Boolean(user)}
         onSectionChange={(section) => {
           const nextSection = section as Section;
             window.history.pushState({}, '', `/${nextSection}`);
@@ -265,7 +284,7 @@ function App() {
 
       <div className="ml-[285px] pt-16">
 
-        <main id="main-content" className={currentSection === 'research' ? 'h-screen' : currentSection === 'home' || currentSection === 'fun' || currentSection === 'responsible-ai' || currentSection === 'platform-status' || currentSection === 'about' || currentSection === 'architecture' || currentSection === 'research-library' || currentSection === 'saved-research' || currentSection === 'analytics' ? '' : 'p-8'} role="main">
+        <main id="main-content" tabIndex={-1} className={currentSection === 'research' ? 'h-screen' : currentSection === 'home' || currentSection === 'fun' || currentSection === 'responsible-ai' || currentSection === 'platform-status' || currentSection === 'about' || currentSection === 'architecture' || currentSection === 'research-library' || currentSection === 'saved-research' || currentSection === 'analytics' ? '' : 'p-8'} role="main">
           {renderSection()}
         </main>
 

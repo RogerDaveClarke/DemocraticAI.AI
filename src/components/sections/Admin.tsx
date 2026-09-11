@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { API_URL } from '@/config/runtime';
+import { terminateAuthenticatedSession } from '@/utils/authSession';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -15,14 +16,17 @@ const API = (import.meta.env.VITE_API_URL || API_URL).replace(/\/$/, '');
 
 async function adminFetch(path: string, options: RequestInit = {}) {
   const token = await auth.currentUser?.getIdToken();
-  return fetch(`${API}${path}`, {
+  const response = await fetch(`${API}${path}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
   });
+  if (response.status === 401) await terminateAuthenticatedSession();
+  return response;
 }
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -30,6 +34,7 @@ async function adminFetch(path: string, options: RequestInit = {}) {
 interface AccessRequest { id: string; email: string; requestedAt: any; status: string }
 interface AdminUser {
   uid: string; email: string; displayName: string; disabled: boolean;
+  accessStatus: 'active' | 'deleted' | 'forced_out' | 'suspected' | 'suspended';
   isAdmin: boolean; createdAt: string; lastSignIn: string;
   dailyQueryLimit: number; dailyTokenLimit: number;
 }
@@ -203,6 +208,13 @@ function UsersTab() {
     load();
   };
 
+  const flagAsSuspected = async (user: AdminUser) => {
+    const reason = window.prompt(`Why is ${user.email} being flagged? Leave blank if the reason is recorded elsewhere.`);
+    if (reason === null) return;
+    await adminFetch(`/api/admin/users/${user.uid}/suspect`, { method: 'POST', body: JSON.stringify({ reason }) });
+    load();
+  };
+
   const handleCreate = async () => {
     if (!newEmail) return;
     setCreating(true);
@@ -287,14 +299,15 @@ function UsersTab() {
                 {savingLimitFor === u.uid && <span className="text-teal-600">Saving</span>}
               </div>
             </td>
-            <td className="py-2.5 pr-3"><Badge label={u.disabled ? 'Suspended' : 'Active'} color={u.disabled ? 'amber' : 'green'} /></td>
+            <td className="py-2.5 pr-3"><Badge label={u.accessStatus === 'suspected' ? 'Flagged & suspended' : u.disabled ? 'Suspended' : 'Active'} color={u.accessStatus === 'suspected' ? 'red' : u.disabled ? 'amber' : 'green'} /></td>
             <td className="py-2.5">
               <div className="flex flex-wrap gap-1">
                 {u.disabled
                   ? <Btn variant="success" small onClick={() => action(`/api/admin/users/${u.uid}/enable`)}><ShieldCheck className="h-3 w-3" />Reactivate</Btn>
                   : !isSoleAdmin && <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/disable`)}><ShieldOff className="h-3 w-3" />Suspend</Btn>
                 }
-                {!isSoleAdmin && <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/revoke-tokens`)}><LogOut className="h-3 w-3" />Force out</Btn>}
+                {!u.disabled && !isSoleAdmin && <Btn variant="danger" small onClick={() => flagAsSuspected(u)}><ShieldOff className="h-3 w-3" />Flag &amp; suspend</Btn>}
+                {!u.disabled && !isSoleAdmin && <Btn variant="ghost" small onClick={() => action(`/api/admin/users/${u.uid}/revoke-tokens`)}><LogOut className="h-3 w-3" />Force out &amp; block</Btn>}
                 {!u.isAdmin && <Btn variant="danger" small onClick={() => { if (confirm(`Delete ${u.email}?`)) action(`/api/admin/users/${u.uid}`, 'DELETE'); }}><Trash2 className="h-3 w-3" />Delete</Btn>}
               </div>
             </td>

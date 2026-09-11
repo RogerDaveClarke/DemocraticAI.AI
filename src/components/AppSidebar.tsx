@@ -24,6 +24,7 @@ interface AppSidebarProps {
   onBackToHome: () => void;
   onSectionChange: (section: string) => void;
   isAdmin?: boolean;
+  isAuthenticated?: boolean;
 }
 
 type NavItem = {
@@ -32,6 +33,7 @@ type NavItem = {
   icon: LucideIcon;
   description?: string;
   adminOnly?: boolean;
+  authenticatedOnly?: boolean;
 };
 
 type NavGroup = {
@@ -43,9 +45,9 @@ const navGroups: NavGroup[] = [
   {
     heading: 'Main',
     items: [
-      { id: 'research', label: 'Research', icon: MessageCircle, description: 'AI Assistant' },
-      { id: 'research-library', label: 'Research Library', icon: Library, description: 'Saved prompts & reports' },
-      { id: 'saved-research', label: 'Saved Research', icon: BookOpen, description: 'Your conversations' },
+      { id: 'research', label: 'Research', icon: MessageCircle, description: 'AI Assistant', authenticatedOnly: true },
+      { id: 'research-library', label: 'Research Library', icon: Library, description: 'Saved prompts & reports', authenticatedOnly: true },
+      { id: 'saved-research', label: 'Saved Research', icon: BookOpen, description: 'Your conversations', authenticatedOnly: true },
     ],
   },
   {
@@ -60,8 +62,8 @@ const navGroups: NavGroup[] = [
   {
     heading: 'AI Analytics',
     items: [
-      { id: 'advanced-ai-analytics', label: 'Advanced AI Analytics', icon: Target, description: 'Linguistic & behavioral insights' },
-      { id: 'ai-integrity', label: 'AI Integrity', icon: ShieldCheck, description: 'Detect AI-assisted text' },
+      { id: 'advanced-ai-analytics', label: 'Advanced AI Analytics', icon: Target, description: 'Linguistic & behavioral insights', authenticatedOnly: true },
+      { id: 'ai-integrity', label: 'AI Integrity', icon: ShieldCheck, description: 'Detect AI-assisted text', authenticatedOnly: true },
     ],
   },
   {
@@ -91,7 +93,7 @@ const navGroups: NavGroup[] = [
     ],
   },];
 
-export default function AppSidebar({ currentSection, onBackToHome, onSectionChange, isAdmin = false }: AppSidebarProps) {
+export default function AppSidebar({ currentSection, onBackToHome, onSectionChange, isAdmin = false, isAuthenticated = false }: AppSidebarProps) {
   const homeActive = currentSection === 'home';
 
   return (
@@ -100,7 +102,7 @@ export default function AppSidebar({ currentSection, onBackToHome, onSectionChan
         <div className="mb-2 flex items-start gap-3">
           <Landmark className="h-8 w-8 text-[var(--color-teal-500)]" />
           <div>
-            <h1 className="whitespace-nowrap text-[24px] font-bold leading-tight text-white">Democratic AI</h1>
+            <div className="whitespace-nowrap text-[24px] font-bold leading-tight text-white">Democratic AI</div>
             <p className="mt-1 text-[13px] leading-none text-slate-300">Research Platform</p>
           </div>
         </div>
@@ -120,7 +122,7 @@ export default function AppSidebar({ currentSection, onBackToHome, onSectionChan
             <div className="px-6 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               {group.heading}
             </div>
-            {group.items.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+            {group.items.filter((item) => (!item.adminOnly || isAdmin) && (!item.authenticatedOnly || isAuthenticated)).map((item) => {
               const isActive = currentSection === item.id;
               const Icon = item.icon;
               return (

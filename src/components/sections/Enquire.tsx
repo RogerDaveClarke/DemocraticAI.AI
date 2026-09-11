@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import PromptLibrary from '../PromptLibrary';
 import { useLoadingAnnouncer } from '../../hooks/accessibilityHooks';
 import { sanitizeInput, validateQueryInput } from '../../utils/security';
-import { apiPost } from '../../utils/api';
+import { apiGet, apiPost } from '../../utils/api';
 import { promptLibrary } from '../../data/promptLibrary';
 import { PageShell } from '@/components/patterns';
 import { API_URL } from '@/config/runtime';
@@ -154,7 +154,6 @@ export default function Enquire() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [feedbackStates, setFeedbackStates] = useState<Record<string, { sentiment?: 'up' | 'down'; panelOpen: boolean; category: string; verbatim: string; submitted: boolean; }>>({});
-  const userLanguage: 'en' | 'ga' = 'en';
   const [selectedPromptId, setSelectedPromptId] = useState<string | undefined>(undefined);
   const [executionsMap, setExecutionsMap] = useState<Map<string, PromptExecution>>(new Map());
   const [selectedResearchGoal, setSelectedResearchGoal] = useState('');

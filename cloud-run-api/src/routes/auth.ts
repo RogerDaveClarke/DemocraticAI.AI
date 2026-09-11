@@ -104,7 +104,14 @@ const getMicrosoftUserProfile = async (accessToken: string): Promise<MicrosoftPr
 };
 
 const sanitizeUser = (userDoc: UserDocument): User => {
-  const { mfaSecret, mfaBackupCodes, refreshTokens, loginAttempts, lockoutUntil, ...user } = userDoc;
+  const {
+    mfaSecret: _mfaSecret,
+    mfaBackupCodes: _mfaBackupCodes,
+    refreshTokens: _refreshTokens,
+    loginAttempts: _loginAttempts,
+    lockoutUntil: _lockoutUntil,
+    ...user
+  } = userDoc;
   return user;
 };
 

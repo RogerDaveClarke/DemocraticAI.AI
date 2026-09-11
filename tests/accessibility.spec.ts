@@ -5,7 +5,8 @@ test.describe('Parliament Explorer - Accessibility', () => {
     await page.goto('/');
     
     // Check for h1 tag
-    const h1 = page.locator('h1');
+    const h1 = page.getByRole('main').locator('h1');
+    await expect(h1).toHaveCount(1);
     await expect(h1).toBeVisible();
     
     // Verify heading structure
@@ -18,7 +19,8 @@ test.describe('Parliament Explorer - Accessibility', () => {
     
     // Check for proper navigation landmarks
     await expect(page.locator('nav')).toBeVisible();
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.getByRole('main')).toHaveCount(1);
+    await expect(page.getByRole('main')).toBeVisible();
     
     // Check for proper button labeling
     const buttons = page.locator('button');
@@ -37,26 +39,17 @@ test.describe('Parliament Explorer - Accessibility', () => {
   test('should be keyboard navigable', async ({ page }) => {
     await page.goto('/');
     
-    // Test keyboard navigation
-    await page.keyboard.press('Tab');
-    
-    // Check that focus is visible
-    const focusedElement = page.locator(':focus');
-    await expect(focusedElement).toBeVisible();
-    
-    // Test more tab navigation
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Tab');
-    
-    // Test Enter key on focused elements
-    await page.keyboard.press('Enter');
+    const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+    await skipLink.focus();
+    await expect(skipLink).toBeFocused();
+    await skipLink.press('Enter');
+    await expect(page.getByRole('main')).toBeFocused();
   });
 
-  test('should have sufficient color contrast', async ({ page }) => {
+  test('should render readable text content', async ({ page }) => {
     await page.goto('/');
-    
-    // This would typically use a specialized accessibility testing library
-    // For now, we'll check that text is visible and readable
+    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
+
     const textElements = page.locator('p, span, a, button, h1, h2, h3, h4, h5, h6');
     const count = await textElements.count();
     

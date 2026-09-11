@@ -1,9 +1,11 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Mail, UserRound, LogOut, Trash2, ShieldCheck, Shield } from 'lucide-react';
-import { signOut, deleteUser } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useIsAdmin } from '../hooks/useIsAdmin';
+import { terminateAuthenticatedSession } from '../utils/authSession';
+import { makeAPIRequest } from '../utils/api';
 
 interface AppHeaderProps {
   onBackToHome: () => void;
@@ -25,7 +27,8 @@ export default function AppHeader({ onBackToHome: _onBackToHome }: AppHeaderProp
 
   const getPrivacySettings = async () => {
     const token = await auth.currentUser?.getIdToken();
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/privacy`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/privacy`, { cache: 'no-store', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (response.status === 401) await terminateAuthenticatedSession();
     if (!response.ok) throw new Error('Could not load privacy settings.');
     return response.json() as Promise<{ exists: boolean; promptRetentionOptOut: boolean }>;
   };
@@ -50,9 +53,11 @@ export default function AppHeader({ onBackToHome: _onBackToHome }: AppHeaderProp
       const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/privacy`, {
         method: 'PATCH',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ promptRetentionOptOut }),
       });
+      if (response.status === 401) await terminateAuthenticatedSession();
       if (!response.ok) throw new Error('Could not save privacy settings.');
       setShowPrivacySettings(false);
     } catch (error) {
@@ -99,10 +104,11 @@ export default function AppHeader({ onBackToHome: _onBackToHome }: AppHeaderProp
     setDeleting(true);
     setDeleteError('');
     try {
-      await deleteUser(user);
+      await makeAPIRequest('/api/user/account', { method: 'DELETE' });
+      await terminateAuthenticatedSession();
     } catch (e: any) {
       setDeleteError(
-        e.code === 'auth/requires-recent-login'
+        e.code === 'auth/requires-recent-login' || e.message?.includes('Recent sign-in required')
           ? 'For security, sign out and use a new email link and authenticator code, then try again.'
           : `Deletion failed (${e.code}).`
       );
@@ -123,7 +129,7 @@ export default function AppHeader({ onBackToHome: _onBackToHome }: AppHeaderProp
               Subscribe
             </button>
 
-            <div className="relative" ref={menuRef}>
+            {user ? <div className="relative" ref={menuRef}>
               <button
                 type="button"
                 onClick={() => setMenuOpen(o => !o)}
@@ -173,7 +179,7 @@ export default function AppHeader({ onBackToHome: _onBackToHome }: AppHeaderProp
                   </button>
                 </div>
               )}
-            </div>
+            </div> : <button type="button" onClick={() => { window.location.href = '/research'; }} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--dai-border)] px-3 py-1.5 text-sm font-medium text-[var(--dai-ink)] hover:bg-slate-50"><UserRound className="h-4 w-4" />Sign in</button>}
           </div>
         </div>
       </header>

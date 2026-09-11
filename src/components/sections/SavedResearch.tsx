@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleEllipsis,
   Clock3,
   Cloud,
   Download,
@@ -33,57 +32,6 @@ type SavedReport = {
   ratingTotal: number; ratingCount: number; model: string; tokensInput: number; tokensOutput: number; cost: number;
   private?: boolean; isOwner?: boolean;
 };
-
-const savedItems = [
-  {
-    title: 'Housing Crisis: Key Themes and Party Positions',
-    summary: 'Comprehensive analysis of housing debate themes, government actions and party differences.',
-    date: '27 May 2025',
-    sources: 12,
-    type: 'Report',
-    icon: FileText,
-    active: true,
-  },
-  {
-    title: 'AI Mentions in Parliamentary Debates',
-    summary: 'Explored how AI is discussed across recent debates and key policy areas.',
-    date: '24 May 2025',
-    sources: 8,
-    type: 'Conversation',
-    icon: MessageCircle,
-  },
-  {
-    title: 'Climate Action Bill Analysis',
-    summary: 'Plain language explanation of the Climate Action and Low Carbon Development Bill.',
-    date: '20 May 2025',
-    sources: 15,
-    type: 'Report',
-    icon: FileText,
-  },
-  {
-    title: 'Member Profile: Leo Varadkar',
-    summary: 'Summary of career, key speeches and voting record.',
-    date: '18 May 2025',
-    sources: 6,
-    type: 'Report',
-    icon: Lightbulb,
-  },
-  {
-    title: 'Voting Patterns on Healthcare',
-    summary: 'Comparison of party voting behaviour on major healthcare legislation.',
-    date: '15 May 2025',
-    sources: 10,
-    type: 'Report',
-    icon: Bookmark,
-  },
-];
-
-const summaryBullets = [
-  'Housing supply and planning reform were the most discussed themes across all parties.',
-  'Government emphasized increased delivery targets and infrastructure investment.',
-  'Opposition parties called for stronger rent controls and faster delivery of social housing.',
-  'Cross-party agreement on the need for long-term, sustainable housing strategy.',
-];
 
 const statCards = [
   { value: '18', label: 'Saved Reports', sub: 'Total saved', icon: Bookmark },

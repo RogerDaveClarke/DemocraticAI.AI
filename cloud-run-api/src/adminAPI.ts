@@ -5,6 +5,7 @@ import { initializeApp as adminInitApp, getApps as adminGetApps } from 'firebase
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getRemoteConfig } from 'firebase-admin/remote-config';
 import { generatePasswordlessLink, sendPasswordlessEmail } from './passwordlessAuthAPI';
+import { containAccount } from './utils/accountContainment';
 // Uses native fetch (Node 18+) -- no SDK dependency required
 async function resendEmail(to: string, subject: string, html: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
@@ -42,7 +43,12 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) { res.status(401).json({ error: 'Unauthorised' }); return; }
   try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
+    const decoded = await getAdminAuth().verifyIdToken(token, true);
+    const access = await db.collection('account_access').doc(decoded.uid).get();
+    if (access.exists && access.data()?.active === false) {
+      res.status(401).json({ error: 'Session terminated', code: 'auth/session-terminated' });
+      return;
+    }
     const isAdmin = decoded['admin'] === true;
     if (!isAdmin && decoded['approved'] !== true) { res.status(403).json({ error: 'Account not approved' }); return; }
     if (process.env.NODE_ENV !== 'development' && !decoded.firebase?.sign_in_second_factor) { res.status(403).json({ error: 'Two-factor authentication required', code: 'auth/mfa-required' }); return; }
@@ -83,6 +89,7 @@ class AdminAPI {
           try { user = await getAdminAuth().getUserByEmail(email); }
           catch { user = await getAdminAuth().createUser({ email, emailVerified: false }); }
           await getAdminAuth().setCustomUserClaims(user.uid, { ...user.customClaims, approved: true });
+          await db.collection('account_access').doc(user.uid).set({ active: true, status: 'active', updatedAt: new Date() });
           await docRef.update({ uid: user.uid });
           const signInLink = await generatePasswordlessLink(email);
           let emailSent = false; let emailError: string | undefined;
@@ -102,17 +109,24 @@ class AdminAPI {
   async listUsers(_req: Request, res: Response): Promise<void> {
     try {
       const result = await getAdminAuth().listUsers(1000);
-      const profiles = await Promise.all(result.users.map((user) => db.collection('user_usage_limits').doc(user.uid).get()));
+      const profiles = await Promise.all(result.users.map(async (user) => {
+        const [usage, access] = await Promise.all([
+          db.collection('user_usage_limits').doc(user.uid).get(),
+          db.collection('account_access').doc(user.uid).get(),
+        ]);
+        return { usage, access };
+      }));
       res.json(result.users.map((u, index) => ({
         uid: u.uid,
         email: u.email ?? '',
         displayName: u.displayName ?? '',
-        disabled: u.disabled,
+        disabled: u.disabled || profiles[index].access.data()?.active === false,
+        accessStatus: profiles[index].access.data()?.status ?? (u.disabled ? 'suspended' : 'active'),
         isAdmin: (u.customClaims as any)?.admin === true,
         createdAt: u.metadata.creationTime,
         lastSignIn: u.metadata.lastSignInTime,
-        dailyQueryLimit: profiles[index].data()?.dailyQueryLimit ?? 50,
-        dailyTokenLimit: profiles[index].data()?.dailyTokenLimit ?? 100000,
+        dailyQueryLimit: profiles[index].usage.data()?.dailyQueryLimit ?? 50,
+        dailyTokenLimit: profiles[index].usage.data()?.dailyTokenLimit ?? 100000,
       })));
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   }
@@ -124,6 +138,7 @@ class AdminAPI {
       const normalizedEmail = email.trim().toLowerCase();
       const user = await getAdminAuth().createUser({ email: normalizedEmail, displayName: displayName ?? '', emailVerified: false });
       await getAdminAuth().setCustomUserClaims(user.uid, { approved: true });
+      await db.collection('account_access').doc(user.uid).set({ active: true, status: 'active', updatedAt: new Date() });
       const signInLink = await generatePasswordlessLink(normalizedEmail);
       let emailSent = false; let emailError: string | undefined;
       try { await sendPasswordlessEmail(normalizedEmail, signInLink, displayName ?? '', true); emailSent = true; }
@@ -134,15 +149,19 @@ class AdminAPI {
 
   async deleteUserAdmin(req: Request, res: Response): Promise<void> {
     try {
-      await getAdminAuth().deleteUser(req.params.uid);
+      const { uid } = req.params;
+      if ((req as any).uid === uid) { res.status(400).json({ error: 'You cannot delete your own account.' }); return; }
+      await containAccount(getAdminAuth(), db.collection('account_access').doc(uid), uid, 'deleted', 'delete');
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   }
 
   async disableUser(req: Request, res: Response): Promise<void> {
     try {
-      const user = await getAdminAuth().getUser(req.params.uid);
-      await getAdminAuth().updateUser(req.params.uid, { disabled: true });
+      const { uid } = req.params;
+      if ((req as any).uid === uid) { res.status(400).json({ error: 'You cannot suspend your own account.' }); return; }
+      const user = await getAdminAuth().getUser(uid);
+      await containAccount(getAdminAuth(), db.collection('account_access').doc(uid), uid, 'suspended', 'disable');
       if (user.email) {
         sendSuspensionEmail(user.email, user.displayName ?? '').catch(e =>
           console.error('[email] Suspension email failed:', e)
@@ -154,14 +173,29 @@ class AdminAPI {
 
   async enableUser(req: Request, res: Response): Promise<void> {
     try {
-      await getAdminAuth().updateUser(req.params.uid, { disabled: false });
+      const { uid } = req.params;
+      await getAdminAuth().updateUser(uid, { disabled: false });
+      await db.collection('account_access').doc(uid).set({ active: true, status: 'active', updatedAt: new Date() });
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  }
+
+  async suspectUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { uid } = req.params;
+      if ((req as any).uid === uid) { res.status(400).json({ error: 'You cannot flag your own account.' }); return; }
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      await containAccount(getAdminAuth(), db.collection('account_access').doc(uid), uid, 'suspected', 'disable');
+      await db.collection('security_events').add({ type: 'account_suspected', targetUid: uid, reason, timestamp: new Date(), actorUid: (req as any).uid });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   }
 
   async revokeUserTokens(req: Request, res: Response): Promise<void> {
     try {
-      await getAdminAuth().revokeRefreshTokens(req.params.uid);
+      const { uid } = req.params;
+      if ((req as any).uid === uid) { res.status(400).json({ error: 'You cannot force out your own account.' }); return; }
+      await containAccount(getAdminAuth(), db.collection('account_access').doc(uid), uid, 'forced_out', 'revoke');
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   }
@@ -352,6 +386,7 @@ export function setupAdminRoutes(app: express.Application): void {
   app.delete('/api/admin/users/:uid',              ...guard, (req, res) => api.deleteUserAdmin(req, res));
   app.post('/api/admin/users/:uid/disable',        ...guard, (req, res) => api.disableUser(req, res));
   app.post('/api/admin/users/:uid/enable',         ...guard, (req, res) => api.enableUser(req, res));
+  app.post('/api/admin/users/:uid/suspect',        ...guard, (req, res) => api.suspectUser(req, res));
   app.post('/api/admin/users/:uid/revoke-tokens',  ...guard, (req, res) => api.revokeUserTokens(req, res));
   app.get('/api/admin/usage',                      ...guard, (req, res) => api.getUsage(req, res));
   app.get('/api/admin/feedback',                   ...guard, (req, res) => api.getFeedback(req, res));

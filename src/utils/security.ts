@@ -253,5 +253,5 @@ export function escapeHtml(text: string): string {
     '/': '&#x2F;',
   };
   
-  return text.replace(/[&<>"'\/]/g, (s) => map[s]);
+  return text.replace(/[&<>"'/]/g, (s) => map[s]);
 }

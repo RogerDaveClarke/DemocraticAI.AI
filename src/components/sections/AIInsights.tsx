@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   Bookmark,
   ChevronDown,
   CircleUserRound,
@@ -11,115 +10,19 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  Sparkles,
   Star,
   Share2,
-  Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { PageShell } from '@/components/patterns/PageShell';
 import { apiGet } from '@/utils/api';
 
-type PromptCard = {
-  title: string;
-  description: string;
-  tags: string[];
-  meta: string;
-  uses: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconTint: string;
-};
-
 const stats = [
   { value: '24', label: 'Public Prompts', sub: 'Curated by experts', icon: Library },
   { value: '7', label: 'My Prompts', sub: 'Created by you', icon: CircleUserRound },
   { value: '18', label: 'Saved Reports', sub: 'Your research', icon: Bookmark },
   { value: '92', label: 'Conversations', sub: 'This month', icon: Clock3 },
-];
-
-const promptCards: PromptCard[] = [
-  {
-    title: 'Analyze bias framing in a debate',
-    description: 'Identify framing techniques, loaded language, and rhetorical strategies used by speakers.',
-    tags: ['Debate Analysis', 'Bias'],
-    meta: '4.9',
-    uses: '1.2k uses',
-    icon: MessageSquare,
-    iconTint: 'bg-blue-50 text-blue-600',
-  },
-  {
-    title: 'Summarize the main debate themes this year',
-    description: 'Extract the key topics and emerging themes from parliamentary debates.',
-    tags: ['Trends', 'Summary'],
-    meta: '4.8',
-    uses: '985 uses',
-    icon: Sparkles,
-    iconTint: 'bg-emerald-50 text-emerald-600',
-  },
-  {
-    title: 'Analyze sentiment in parliamentary debate',
-    description: 'Determine the overall sentiment and emotional tone of debate contributions.',
-    tags: ['Sentiment Analysis', 'NLP'],
-    meta: '4.7',
-    uses: '842 uses',
-    icon: BookOpen,
-    iconTint: 'bg-violet-50 text-violet-600',
-  },
-  {
-    title: "How has the government's position changed over time?",
-    description: 'Track and compare the government’s stance on an issue across time periods.',
-    tags: ['Trend Analysis', 'Government'],
-    meta: '4.9',
-    uses: '1.1k uses',
-    icon: ShieldCheck,
-    iconTint: 'bg-orange-50 text-orange-600',
-  },
-  {
-    title: "Show this member's recent voting history",
-    description: 'Display a member’s votes, positions, and alignment on key legislation.',
-    tags: ['Members', 'Voting'],
-    meta: '4.8',
-    uses: '1.0k uses',
-    icon: Users,
-    iconTint: 'bg-blue-50 text-blue-600',
-  },
-  {
-    title: 'Explain this bill in plain language',
-    description: 'Generate a citizen-friendly explanation of a bill and its implications.',
-    tags: ['Legislation', 'Explanation'],
-    meta: '4.9',
-    uses: '1.5k uses',
-    icon: BookOpen,
-    iconTint: 'bg-emerald-50 text-emerald-600',
-  },
-  {
-    title: 'Compare voting patterns between parties',
-    description: 'Analyze how parties vote on key issues and legislation.',
-    tags: ['Voting', 'Comparison'],
-    meta: '4.7',
-    uses: '912 uses',
-    icon: Users,
-    iconTint: 'bg-pink-50 text-pink-600',
-  },
-  {
-    title: 'Detect likely AI usage in this speech',
-    description: 'Analyze a speech for patterns that may indicate AI assistance.',
-    tags: ['AI Integrity', 'Detection'],
-    meta: '4.6',
-    uses: '673 uses',
-    icon: ShieldCheck,
-    iconTint: 'bg-red-50 text-red-600',
-  },
-  {
-    title: 'Find key quotes from this debate',
-    description: 'Extract the most important and impactful quotes from a debate.',
-    tags: ['Debate', 'Quotes'],
-    meta: '4.8',
-    uses: '1.3k uses',
-    icon: Search,
-    iconTint: 'bg-amber-50 text-amber-600',
-  },
 ];
 
 const categoryItems = [

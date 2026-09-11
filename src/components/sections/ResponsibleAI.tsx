@@ -113,7 +113,7 @@ export default function ResponsibleAI() {
   return (
     <PageShell>
       <div className="grid grid-cols-1 gap-6 px-8 py-6 xl:grid-cols-[1fr_280px]">
-          <main className="min-w-0 space-y-8">
+          <div className="min-w-0 space-y-8">
             <section className="relative overflow-hidden rounded-2xl border border-[var(--dai-border)] bg-gradient-to-r from-white via-white to-[#f4f9ff] p-8 shadow-sm">
               <div className="pointer-events-none absolute -right-10 -top-4 hidden h-64 w-80 items-center justify-center xl:flex">
                 <div className="absolute inset-0 rounded-full bg-cyan-100/40 blur-2xl" />
@@ -204,7 +204,7 @@ export default function ResponsibleAI() {
               </p>
               <p>Last updated: May 27, 2025</p>
             </section>
-          </main>
+          </div>
 
           <aside className="space-y-4">
             <section className="rounded-2xl border border-[var(--dai-border)] bg-white p-4 shadow-sm">

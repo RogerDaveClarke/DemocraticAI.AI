@@ -1,5 +1,6 @@
 import { API_URL } from '@/config/runtime';
 import { auth } from '@/config/firebase';
+import { terminateAuthenticatedSession } from '@/utils/authSession';
 /**
  * API Utility for secure API communications
  * Handles authentication, headers, and error handling
@@ -38,6 +39,7 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
   const requestOptions: RequestInit = {
     ...options,
     headers,
+    cache: 'no-store',
   };
   
   try {
@@ -51,6 +53,7 @@ export async function makeAPIRequest(endpoint: string, options: RequestInit = {}
     
     // Handle authentication errors
     if (response.status === 401) {
+      await terminateAuthenticatedSession();
       throw new Error(`Authentication failed. Please sign in again. Request ID: ${response.headers.get('X-Request-ID') || 'unavailable'}`);
     }
     

@@ -242,7 +242,7 @@ async function listUserBills(): Promise<string[]> {
     // Extract bill IDs from object names
     return items.map((item: any) => {
       const name = item.name;
-      const match = name.match(/bills\/[^\/]+\/([^\/]+)\.json/);
+      const match = name.match(/bills\/[^/]+\/([^/]+)\.json/);
       return match ? match[1] : null;
     }).filter(Boolean);
   } catch (error) {

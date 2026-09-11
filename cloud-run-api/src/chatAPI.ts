@@ -11,22 +11,32 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { initializeApp as adminInitApp, getApps as adminGetApps } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { NextFunction } from 'express';
+import { isQueryInputValid, sanitizeQueryInput } from './utils/inputSecurity';
+import { containAccount } from './utils/accountContainment';
 
 // Initialise the Admin SDK once; Cloud Run's service account provides credentials automatically.
 if (!adminGetApps().length) {
   adminInitApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
 }
 
+const accountDb = new Firestore({ projectId: process.env.GOOGLE_CLOUD_PROJECT ?? process.env.VITE_FIREBASE_PROJECT_ID });
+
 async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) { res.status(401).json({ error: 'Unauthorised' }); return; }
   try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
+    const decoded = await getAdminAuth().verifyIdToken(token, true);
+    const access = await accountDb.collection('account_access').doc(decoded.uid).get();
+    if (access.exists && access.data()?.active === false) {
+      res.status(401).json({ error: 'Session terminated', code: 'auth/session-terminated' });
+      return;
+    }
     const isAdmin = decoded['admin'] === true;
     if (!isAdmin && decoded['approved'] !== true) { res.status(403).json({ error: 'Account not approved' }); return; }
     if (process.env.NODE_ENV !== 'development' && !decoded.firebase?.sign_in_second_factor) { res.status(403).json({ error: 'Two-factor authentication required', code: 'auth/mfa-required' }); return; }
     (req as any).uid = decoded.uid;
     (req as any).isAdmin = isAdmin;
+    (req as any).authTime = decoded.auth_time;
     next();
   } catch (error) { console.warn('[chat] Firebase token rejected:', error instanceof Error ? error.message : 'unknown error'); res.status(401).json({ error: 'Invalid token' }); }
 }
@@ -262,28 +272,16 @@ class ChatAPI {
       }: ChatRequest = req.body;
 
       // Input validation
-      if (!query || typeof query !== 'string' || query.trim().length < 3) {
+      if (!isQueryInputValid(query)) {
         res.status(400).json({
           error: 'Invalid query',
-          message: 'Query must be a string with at least 3 characters'
+          message: 'Query must be a safe string between 3 and 2000 characters'
         });
         return;
       }
 
-      if (query.length > 2000) {
-        res.status(400).json({
-          error: 'Query too long',
-          message: 'Query must be less than 2000 characters'
-        });
-        return;
-      }
-
-      // Sanitize query input
-      const sanitizedQuery = query
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/javascript:/gi, '')
-        .replace(/on\w+\s*=/gi, '')
-        .trim();
+      // Sanitize query input before retrieval and model invocation
+      const sanitizedQuery = sanitizeQueryInput(query);
 
       if (!sanitizedQuery) {
         res.status(400).json({
@@ -993,6 +991,23 @@ class ChatAPI {
     }
   }
 
+  async deleteOwnAccount(req: Request, res: Response): Promise<void> {
+    const uid = (req as any).uid as string;
+    const authTime = (req as any).authTime as number | undefined;
+    if (!authTime || Math.floor(Date.now() / 1000) - authTime > 300) {
+      res.status(403).json({ error: 'Recent sign-in required', code: 'auth/requires-recent-login' });
+      return;
+    }
+
+    try {
+      await containAccount(getAdminAuth(), accountDb.collection('account_access').doc(uid), uid, 'deleted', 'delete');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+      res.status(500).json({ error: 'Failed to delete account' });
+    }
+  }
+
   /**
    * Search and retrieve context documents from BigQuery
    */
@@ -1024,6 +1039,7 @@ class ChatAPI {
 
   async listBillsForScope(_req: Request, res: Response): Promise<void> {
     try {
+      res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
       const [rows] = await this.bq.query({
         query: `
           SELECT
@@ -1046,6 +1062,7 @@ class ChatAPI {
 
   async listDebatesForScope(_req: Request, res: Response): Promise<void> {
     try {
+      res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
       const [rows] = await this.bq.query({
         query: `
           SELECT
@@ -1288,6 +1305,7 @@ export function setupChatRoutes(app: express.Application): void {
   app.get('/api/data-status',         (req, res) => chatAPI.getDataStatus(req, res));
   app.post('/api/access-requests',     (req, res) => chatAPI.recordAccessRequest(req, res));
   app.delete('/api/chat/history', requireAuth, (req, res) => chatAPI.deleteChatHistory(req, res));
+  app.delete('/api/user/account', requireAuth, (req, res) => chatAPI.deleteOwnAccount(req, res));
   app.get('/api/user/privacy', requireAuth, (req, res) => chatAPI.getPrivacySettings(req, res));
   app.patch('/api/user/privacy', requireAuth, (req, res) => chatAPI.setPrivacySettings(req, res));
   app.post('/api/prompts', requireAuth, (req, res) => chatAPI.createSavedPrompt(req, res));

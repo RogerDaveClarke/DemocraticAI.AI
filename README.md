@@ -39,6 +39,7 @@ Copy `.env.example` to `.env.local` and supply values from your own Firebase and
 
 ```powershell
 npm ci
+npm run setup:git-hooks
 npm run check:clone-isolation
 npm run typecheck
 npm run dev

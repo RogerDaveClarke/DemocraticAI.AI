@@ -37,11 +37,6 @@ export default defineConfig(({ mode }) => {
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            const packagePath = id.split('node_modules/')[1];
-            const packageName = packagePath?.startsWith('@')
-              ? packagePath.split('/').slice(0, 2).join('/').replace('@', '').replace('/', '-')
-              : packagePath?.split('/')[0];
-
             if (id.includes('@react-three') || id.includes('three')) {
               return 'three-vendor';
             }

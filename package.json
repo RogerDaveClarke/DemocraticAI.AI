@@ -16,7 +16,9 @@
     "test:a11y-lighthouse": "start-server-and-test dev http://localhost:5173 'lighthouse http://localhost:5173 --only-categories=accessibility --chrome-flags=\"--headless\" --output json --output-path=lighthouse-a11y-report.json'",
     "check:a11y": "npm run lint && npm run test:a11y",
     "test:security": "node scripts/security-test.js",
-    "verify:security": "node scripts/verify-security.js",
+    "verify:repo-security": "node scripts/verify-security.mjs",
+    "verify:security": "npm run verify:repo-security",
+    "setup:git-hooks": "node scripts/setup-git-hooks.mjs",
     "check:clone-isolation": "node scripts/check-clone-isolation.mjs"
   },
   "dependencies": {

@@ -83,7 +83,7 @@ const principleCards: PrincipleCard[] = [
 export default function Home() {
   return (
     <PageShell className="bg-white">
-      <main className="space-y-8">
+      <div className="space-y-8">
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_1fr] lg:items-start xl:grid-cols-[1.25fr_1fr]">
           <div>
             <h1 className="text-[clamp(1.9rem,3.6vw,4rem)] font-bold leading-[1.04] text-[var(--dai-ink)] lg:leading-[1.08]">
@@ -290,7 +290,7 @@ export default function Home() {
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </PageShell>
   );
 }
