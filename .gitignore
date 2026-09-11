@@ -27,7 +27,6 @@ dist-ssr
 !.env.template
 !.env.*.template
 !.env.production.template
-!.env.production
 
 # Security files
 *.pem
