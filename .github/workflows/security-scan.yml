@@ -49,8 +49,6 @@ jobs:
         uses: trufflesecurity/trufflehog@1ea7fc1960b818e3c3ac3984f85922e3acba4061
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
           extra_args: --debug --only-verified
 
       # Step 5: Run repository-owned canonical verification command
